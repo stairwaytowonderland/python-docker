@@ -1,0 +1,9 @@
+/.dockerignore
+/docker/bin
+/.devcontainer
+/.vscode
+**/.DS_Store
+**/__pycache__
+**/*.bak
+**/.terraform
+**/Dockerfile
