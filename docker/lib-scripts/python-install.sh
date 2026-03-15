@@ -147,12 +147,12 @@ create_setup() {
         && chmod +x "${PYTHON_LIBDIR}/setup" \
         && cat > "${PYTHON_LIBDIR}/setup" << EOF
 #!/bin/sh
-LEVEL='*' "$LOGGER" "Setting up alternatives for Python ${PYTHON_VERSION}..."
+LEVEL='*' "$LOGGER" "Configuring Python ${PYTHON_VERSION}..."
 
 VERSION="$VERSION"
 PYTHON_VERSION="$PYTHON_VERSION"
 PYTHON_INSTALL_PREFIX="$PYTHON_INSTALL_PREFIX"
-INSTALL_PATH="$INSTALL_PATH"
+PYTHON_INSTALL_PATH="$PYTHON_INSTALL_PATH"
 INSTALL_TOOLS="\${INSTALL_TOOLS:-false}"
 
 # shellcheck disable=SC1090
@@ -164,45 +164,68 @@ major_minor_version=\$(get_major_minor_version "\$VERSION")
 SYSTEM_PYTHON="\$(command -v "/usr/bin/python\${major_version}" || true)"
 ALTERNATIVES_PATH="\${ALTERNATIVES_PATH:-/usr/local/bin}"
 
-"$LOGGER" "Creating symbolic links for Python binaries and libraries..."
-for py in python pip idle pydoc; do
-    [ -e "\${PYTHON_INSTALL_PREFIX}/bin/\${py}" ] || ln -s "\${PYTHON_INSTALL_PREFIX}/bin/\${py}\${major_version}" "\${PYTHON_INSTALL_PREFIX}/bin/\${py}"
-done
-[ -e "\${PYTHON_INSTALL_PREFIX}/bin/python-config" ] || ln -s "\${PYTHON_INSTALL_PREFIX}/bin/python\${major_version}-config" "\${PYTHON_INSTALL_PREFIX}/bin/python-config"
+make_links() {
+    "$LOGGER" "Creating symbolic links for Python binaries and libraries..."
+    for py in python pip idle pydoc; do
+        [ -e "\${PYTHON_INSTALL_PREFIX}/bin/\${py}" ] || ln -s "\${PYTHON_INSTALL_PREFIX}/bin/\${py}\${major_version}" "\${PYTHON_INSTALL_PREFIX}/bin/\${py}"
+    done
+    [ -e "\${PYTHON_INSTALL_PREFIX}/bin/python-config" ] || ln -s "\${PYTHON_INSTALL_PREFIX}/bin/python\${major_version}-config" "\${PYTHON_INSTALL_PREFIX}/bin/python-config"
+}
 
-updaterc "if [[ \"\\\${PATH}\" != *\"\${PYTHON_INSTALL_PREFIX}/bin\"* ]]; then export \"PATH=\${PYTHON_INSTALL_PREFIX}/bin:\\\${PATH}\"; fi" true
-(
-    set -a; . /etc/environment; set +a
-    case ":\${PATH}:" in
-        *":\${PYTHON_INSTALL_PREFIX}/bin:"*) ;;
-        *) printf 'PATH="%s/bin:%s"\n' "\${PYTHON_INSTALL_PREFIX}" "\${PATH}" >> /etc/environment ;;
-    esac
-)
-updaterc "PYTHON_VERSION=\${VERSION}" true
-{
-    echo "PYTHON_VERSION=\"\${VERSION}\""
-    echo "PYTHON_INSTALL_PREFIX=\"\${INSTALL_PATH}\""
-} >> /etc/environment
-
-for py in python pip idle pydoc; do
-    priority=\$((\$( get_alternatives_priority "\$py" "\$major_version") + 1))
-    [ "\$priority" -ge 0 ] || priority=\$((priority + 1))
-    syspy="\$(readlink -f "\${SYSTEM_PYTHON%/bin/python*}/bin/\${py}\${major_version}")"
-    [ ! -x "\$syspy" ] || update-alternatives --install "\${ALTERNATIVES_PATH}/\${py}\${major_version}" "\${py}\${major_version}" "\$syspy" "\$priority" && priority="\$((priority + 1))"
+update_env() {
+    "$LOGGER" "Updating environment variables for Python ${PYTHON_VERSION}..."
+    updaterc "if [[ \"\\\${PATH}\" != *\"\${PYTHON_INSTALL_PREFIX}/bin\"* ]]; then export \"PATH=\${PYTHON_INSTALL_PREFIX}/bin:\\\${PATH}\"; fi" true
+    (
+        . /etc/environment
+        case ":\${PATH}:" in
+            *":\${PYTHON_INSTALL_PREFIX}/bin:"*) ;;
+            *) printf 'PATH="%s/bin:%s"\n' "\${PYTHON_INSTALL_PREFIX}" "\${PATH}" >> /etc/environment ;;
+        esac
+    )
+    updaterc "PYTHON_VERSION=\${VERSION}" true
     {
-        update-alternatives --install "\${ALTERNATIVES_PATH}/\${py}" "\${py}" "\${PYTHON_INSTALL_PREFIX}/bin/\${py}" "\$priority"
-        update-alternatives --install "\${ALTERNATIVES_PATH}/\${py}\${major_version}" "\${py}\${major_version}" "\${PYTHON_INSTALL_PREFIX}/bin/\${py}\${major_version}" "\$priority"
-    } && priority="\$((priority + 1))"
-done
-for py in python-config python\${major_version}-config; do
-    syspy="\$(readlink -f "\${SYSTEM_PYTHON%/bin/python*}/bin/\${py}")"
-    priority=\$((\$( get_alternatives_priority "\$py") + 1))
-    [ "\$priority" -ge 0 ] || priority=\$((priority + 1))
-    [ ! -x "\$syspy" ] || update-alternatives --install "\${ALTERNATIVES_PATH}/\${py}" "\${py}" "\$syspy" "\$priority" && priority="\$((priority + 1))"
-    update-alternatives --install "\${ALTERNATIVES_PATH}/\${py}" "\${py}" "\${PYTHON_INSTALL_PREFIX}/bin/\${py}" "\$priority" && priority="\$((priority + 1))"
-done
+        echo "PYTHON_VERSION=\"\${VERSION}\""
+        echo "PYTHON_INSTALL_PATH=\"${INSTALL_PATH}\""
+    } >> /etc/environment
+}
 
-LEVEL='√' "$LOGGER" "Python \${PYTHON_VERSION} setup complete. Installed at \${INSTALL_PATH}."
+update_alternatives() {
+    "$LOGGER" "Configuring update-alternatives for Python ${PYTHON_VERSION}..."
+    for py in python pip idle pydoc; do
+        priority=\$((\$( get_alternatives_priority "\$py" "\$major_version") + 1))
+        [ "\$priority" -ge 0 ] || priority=\$((priority + 1))
+        syspy="\$(readlink -f "\${SYSTEM_PYTHON%/bin/python*}/bin/\${py}\${major_version}")"
+        [ ! -x "\$syspy" ] || update-alternatives --install "\${ALTERNATIVES_PATH}/\${py}\${major_version}" "\${py}\${major_version}" "\$syspy" "\$priority" && priority="\$((priority + 1))"
+        {
+            update-alternatives --install "\${ALTERNATIVES_PATH}/\${py}" "\${py}" "\${PYTHON_INSTALL_PREFIX}/bin/\${py}" "\$priority"
+            update-alternatives --install "\${ALTERNATIVES_PATH}/\${py}\${major_version}" "\${py}\${major_version}" "\${PYTHON_INSTALL_PREFIX}/bin/\${py}\${major_version}" "\$priority"
+        } && priority="\$((priority + 1))"
+    done
+    for py in python-config python\${major_version}-config; do
+        syspy="\$(readlink -f "\${SYSTEM_PYTHON%/bin/python*}/bin/\${py}")"
+        priority=\$((\$( get_alternatives_priority "\$py") + 1))
+        [ "\$priority" -ge 0 ] || priority=\$((priority + 1))
+        [ ! -x "\$syspy" ] || update-alternatives --install "\${ALTERNATIVES_PATH}/\${py}" "\${py}" "\$syspy" "\$priority" && priority="\$((priority + 1))"
+        update-alternatives --install "\${ALTERNATIVES_PATH}/\${py}" "\${py}" "\${PYTHON_INSTALL_PREFIX}/bin/\${py}" "\$priority" && priority="\$((priority + 1))"
+    done
+}
+
+main() {
+    if [ "\${1-}" = "true" ]; then
+        update_env
+    elif [ "\${1-}" = "false" ]; then
+        make_links
+        update_alternatives
+    else
+        update_env
+        make_links
+        update_alternatives
+    fi
+}
+
+main "\$@"
+
+LEVEL='√' "$LOGGER" "Python \${PYTHON_VERSION} configuration complete. Installed at ${INSTALL_PATH}."
 EOF
 }
 

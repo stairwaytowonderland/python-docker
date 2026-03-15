@@ -35,7 +35,9 @@ COPY docker/helpers/install-helper.sh $INSTALL_HELPER
 
 USER root
 
-RUN /tmp/lib-scripts/python-install.sh \
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends openssl \
+  && /tmp/lib-scripts/python-install.sh \
   # Cleanup build dependencies but keep the Python installation
   && rm -rf ${PYTHON_INSTALL_PREFIX%/}/include/* \
   # && find "$PYTHON_INSTALL_PREFIX/include" -mindepth 1 -maxdepth 1 -exec rm -rf {} \; \
@@ -43,14 +45,16 @@ RUN /tmp/lib-scripts/python-install.sh \
   && apt-get -y autoremove \
   && rm -rf /var/lib/apt/lists/*
 
-RUN set -a; . /etc/environment \
+RUN $PYTHON_INSTALL_PATH/setup true \
+    && . /etc/environment \
+    && VERSION="$PYTHON_VERSION" \
     && touch $PIP_INSTALL \
     && chmod +x $PIP_INSTALL \
     && cat > $PIP_INSTALL <<EOF
 #!/bin/sh
 set -e
 pip_install() {
-  "${PYTHON_INSTALL_PREFIX%/}/bin/python${PYTHON_VERSION%.*}" -m pip install $PIP_INSTALL_FLAGS "\$@"
+  "${PYTHON_INSTALL_PREFIX%/}/bin/python${VERSION%.*}" -m pip install $PIP_INSTALL_FLAGS "\$@"
 }
 pip_install "\$@"
 EOF
@@ -62,7 +66,7 @@ RUN $PIP_INSTALL --upgrade pip \
       && { [ "$INSTALL_TOOLS" != "true" ] || $PIP_INSTALL "$tool"; } \
       || LEVEL='error' $LOGGER "Failed to install $tool"; \
   done \
-  && $PYTHON_INSTALL_PATH/setup \
+  && $PYTHON_INSTALL_PATH/setup false \
   && rm -rf /tmp/*
 
 
@@ -99,6 +103,7 @@ RUN apt-get update \
 	&& apt-get install -y --no-install-recommends \
     ca-certificates \
     jq \
+    openssl \
 		tini \
   && if [ "$PARENT_IMAGE" = "ubuntu" ]; then \
     # As of Ubuntu 24 (Noble Numbat), the Ubuntu base image comes with a non-root user ubuntu with UID 1000.
