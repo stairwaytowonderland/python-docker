@@ -3,8 +3,8 @@
 
 # ./docker/bin/build.sh \
 #   cpython \
-#   --build-arg USERNAME=vscode \
-#   --build-arg PYTHON_VERSION=devcontainer \
+#   --build-arg USERNAME=appuser \
+#   --build-arg PYTHON_VERSION=3.14 \
 #   --no-cache
 #   --progress=plain
 #   .

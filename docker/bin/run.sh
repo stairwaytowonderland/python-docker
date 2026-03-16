@@ -2,8 +2,8 @@
 # shellcheck disable=SC1091
 
 # [REMOTE_HUB=<your-remote-hub>] ./docker/bin/run.sh \
-#   starter-project:<target> \
-#   vscode \
+#   cpython:<target> \
+#   appuser \
 #   .
 
 echo "(ƒ) Preparing to run Docker container..." >&2
