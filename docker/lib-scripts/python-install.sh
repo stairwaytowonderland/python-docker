@@ -9,10 +9,9 @@ LEVEL='ƒ' $LOGGER "Installing Python utilities..."
 
 VERSION="${PYTHON_VERSION:-latest}"
 PYTHON_VERSION="$VERSION"
-PYTHON_INSTALL_PREFIX="${PYTHON_INSTALL_PREFIX:-/opt/python}"
+PYTHON_INSTALL_PREFIX="${PYTHON_INSTALL_PREFIX%/:-/opt/python}"
 PYTHON_INSTALL_PATH="${PYTHON_INSTALL_PATH:-"${PYTHON_INSTALL_PREFIX%/}/lib"}"
-
-PYTHON_MINIMAL="${PYTHON_MINIMAL:-true}"
+PYTHON_DEV="${PYTHON_DEV:-false}"
 
 # shellcheck disable=SC1090
 . "$INSTALL_HELPER"
@@ -74,7 +73,7 @@ install_cpython() {
         find "$PYTHON_INSTALL_PATH" -type f -name '*.pyo' -delete
         find "$PYTHON_INSTALL_PATH"/python* -name 'config-*' -exec rm -rf {} + 2> /dev/null || true
 
-        if [ "$PYTHON_MINIMAL" = "true" ]; then
+        if [ "$PYTHON_DEV" != "true" ]; then
             find "$PYTHON_INSTALL_PATH" -type f -name '*.a' -delete
         fi
     fi
@@ -143,16 +142,16 @@ create_setup() {
     LEVEL='*' "$LOGGER" "Creating configuration script for Python ${PYTHON_VERSION}..."
 
     # shellcheck disable=SC2154
-    touch "${PYTHON_LIBDIR}/setup" \
-        && chmod +x "${PYTHON_LIBDIR}/setup" \
-        && cat > "${PYTHON_LIBDIR}/setup" << EOF
+    touch "${PYTHON_LIBDIR}/python-setup" \
+        && chmod +x "${PYTHON_LIBDIR}/python-setup" \
+        && cat > "${PYTHON_LIBDIR}/python-setup" << EOF
 #!/bin/sh
 LEVEL='*' "$LOGGER" "Configuring Python ${PYTHON_VERSION}..."
 
 VERSION="$VERSION"
 PYTHON_VERSION="$PYTHON_VERSION"
 PYTHON_INSTALL_PREFIX="$PYTHON_INSTALL_PREFIX"
-PYTHON_INSTALL_PATH="$PYTHON_INSTALL_PATH"
+INSTALL_PATH="$INSTALL_PATH"
 INSTALL_TOOLS="\${INSTALL_TOOLS:-false}"
 
 # shellcheck disable=SC1090
@@ -173,7 +172,7 @@ make_links() {
 }
 
 update_env() {
-    "$LOGGER" "Updating environment variables for Python ${PYTHON_VERSION}..."
+    "$LOGGER" "Updating environment variables for Python \${PYTHON_VERSION}..."
     updaterc "if [[ \"\\\${PATH}\" != *\"\${PYTHON_INSTALL_PREFIX}/bin\"* ]]; then export \"PATH=\${PYTHON_INSTALL_PREFIX}/bin:\\\${PATH}\"; fi" true
     (
         . /etc/environment
@@ -185,12 +184,12 @@ update_env() {
     updaterc "PYTHON_VERSION=\${VERSION}" true
     {
         echo "PYTHON_VERSION=\"\${VERSION}\""
-        echo "PYTHON_INSTALL_PATH=\"${INSTALL_PATH}\""
+        echo "PYTHON_INSTALL_PATH=\"\${INSTALL_PATH}\""
     } >> /etc/environment
 }
 
 update_alternatives() {
-    "$LOGGER" "Configuring update-alternatives for Python ${PYTHON_VERSION}..."
+    "$LOGGER" "Configuring update-alternatives for Python \${PYTHON_VERSION}..."
     for py in python pip idle pydoc; do
         priority=\$((\$( get_alternatives_priority "\$py" "\$major_version") + 1))
         [ "\$priority" -ge 0 ] || priority=\$((priority + 1))
@@ -210,12 +209,23 @@ update_alternatives() {
     done
 }
 
+install_tools() {
+    "$LOGGER" "Installing Python tools: {\${PYTHON_TOOLS}}..."
+    for tool in $PYTHON_TOOLS; do
+        [ ! -x "\${PYTHON_INSTALL_PREFIX}/bin/\${tool}" ] || continue
+        LEVEL='*' "$LOGGER" "Installing Python tool: \${tool}..."
+        "$PIP_INSTALL" "\${tool}"
+    done
+}
+
 main() {
-    if [ "\${1-}" = "true" ]; then
+    if [ "\${1-}" = "false" ]; then
         update_env
-    elif [ "\${1-}" = "false" ]; then
+    elif [ "\${1-}" = "true" ]; then
+        $PIP_INSTALL --upgrade pip
         make_links
         update_alternatives
+        [ "\${2:-false}" != "true" ] || install_tools
     else
         update_env
         make_links
@@ -225,7 +235,7 @@ main() {
 
 main "\$@"
 
-LEVEL='√' "$LOGGER" "Python \${PYTHON_VERSION} configuration complete. Installed at ${INSTALL_PATH}."
+LEVEL='√' "$LOGGER" "Python \${PYTHON_VERSION} configuration complete. Installed at \${INSTALL_PATH}."
 EOF
 }
 

@@ -4,6 +4,7 @@ ARG VARIANT=${VARIANT:-latest}
 ARG PARENT_IMAGE=${IMAGE_NAME}:${VARIANT}
 ARG PYTHON_VERSION=latest
 ARG INSTALL_TOOLS=false
+ARG PYTHON_DEV=false
 ARG PYTHON_INSTALL_PREFIX=/usr/local
 ARG PYTHON_INSTALL_PATH=${PYTHON_INSTALL_PREFIX%/}/lib
 ARG LOGGER=/usr/local/bin/logger.sh
@@ -20,8 +21,10 @@ ARG INSTALL_TOOLS
 ARG LOGGER
 ARG PIP_INSTALL
 ARG INSTALL_HELPER
+ARG PYTHON_DEV
 
 ARG PIP_INSTALL_FLAGS="--no-cache-dir --disable-pip-version-check --ignore-installed --break-system-packages --root-user-action=ignore"
+ARG PYTHON_TOOLS="pipx poetry uv"
 
 # Set non-interactive mode for apt-get to avoid prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
@@ -48,7 +51,7 @@ RUN apt-get update \
   && apt-get -y autoremove \
   && rm -rf /var/lib/apt/lists/*
 
-RUN $PYTHON_INSTALL_PATH/setup true \
+RUN $PYTHON_INSTALL_PATH/python-setup false \
     && . /etc/environment \
     && VERSION="$PYTHON_VERSION" \
     && touch $PIP_INSTALL \
@@ -62,14 +65,7 @@ pip_install() {
 pip_install "\$@"
 EOF
 
-RUN $PIP_INSTALL --upgrade pip \
-    # setuptools wheel \
-  && for tool in pipx poetry uv; do \
-    LEVEL='*' $LOGGER "Installing $tool..." \
-      && { [ "$INSTALL_TOOLS" != "true" ] || $PIP_INSTALL "$tool"; } \
-      || LEVEL='error' $LOGGER "Failed to install $tool"; \
-  done \
-  && $PYTHON_INSTALL_PATH/setup false \
+RUN $PYTHON_INSTALL_PATH/python-setup true $INSTALL_TOOLS \
   && rm -rf /tmp/*
 
 
@@ -134,7 +130,7 @@ RUN apt-get update \
       fi; \
   fi \
   && apt-get -s dist-upgrade | grep "^Inst" | grep -i securi | cut -d " " -f 2 | xargs apt-get install -y --no-install-recommends \
-  && $PYTHON_INSTALL_PATH/setup \
+  && $PYTHON_INSTALL_PATH/python-setup \
 	# Cleanup
   && rm -rf /tmp/* \
 	&& apt-get clean -y \

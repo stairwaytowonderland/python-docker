@@ -6,7 +6,9 @@
 		"context": "..",
 		"args": {
 			"USERNAME": "vscode",
-			"PYTHON_VERSION": "3.14"
+			"PYTHON_VERSION": "3.14",
+			"PYTHON_DEV": "true",
+			"INSTALL_TOOLS": "true"
 		}
 	},
 	// Comment out to connect as root instead. More info: https://aka.ms/vscode-remote/containers/non-root
