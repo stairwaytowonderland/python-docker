@@ -119,18 +119,27 @@ RUN apt-get update \
       $LOGGER "User 'ubuntu' does not exist for $IMAGE_NAME"; \
     fi; \
   fi \
+  # Create a non-root user to run the application, if it doesn't already exist
+  && if ! id "$USERNAME" >/dev/null 2>&1; then \
+    $LOGGER "Creating user '$USERNAME' with UID $USER_UID and GID $USER_GID for $IMAGE_NAME" \
+      && groupadd --gid "$USER_GID" "$USERNAME" \
+      && useradd --uid "$USER_UID" --gid "$USER_GID" -m "$USERNAME" -s /bin/bash \
+      || LEVEL=error $LOGGER "Failed to create user '$USERNAME' for $IMAGE_NAME"; \
+      if id "$USERNAME" >/dev/null 2>&1; then \
+        $LOGGER "Changing ownership of /home/$USERNAME to $USERNAME" \
+        && chown "$USERNAME:$USERNAME" -R /home/"$USERNAME"; \
+      else \
+        $LOGGER "User '$USERNAME' does not exist for $IMAGE_NAME"; \
+        exit 1; \
+      fi; \
+  fi \
   && apt-get -s dist-upgrade | grep "^Inst" | grep -i securi | cut -d " " -f 2 | xargs apt-get install -y --no-install-recommends \
   && $PYTHON_INSTALL_PATH/setup \
 	# Cleanup
   && rm -rf /tmp/* \
 	&& apt-get clean -y \
 	&& apt-get -y autoremove \
-	&& rm -rf /var/lib/apt/lists/* \
-	# Create a non-root user to run the application, if it doesn't already exist
-	&& id "$USERNAME" >/dev/null 2>&1 || { \
-		groupadd --gid "$USER_GID" "$USERNAME" \
-		&& useradd --uid "$USER_UID" --gid "$USER_GID" -m "$USERNAME" -s /bin/bash; \
-	} || true
+	&& rm -rf /var/lib/apt/lists/*
 
 USER $USERNAME
 WORKDIR /home/$USERNAME
