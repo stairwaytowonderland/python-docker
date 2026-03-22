@@ -160,15 +160,15 @@ INSTALL_TOOLS="\${INSTALL_TOOLS:-false}"
 major_version=\$(get_major_version "\$VERSION")
 major_minor_version=\$(get_major_minor_version "\$VERSION")
 
-SYSTEM_PYTHON="\$(command -v "/usr/bin/python\${major_version}" || true)"
+SYSTEM_PYTHON="\$(command -v "/usr/bin/python\${major_minor_version}" || true)"
 ALTERNATIVES_PATH="\${ALTERNATIVES_PATH:-/usr/local/bin}"
 
 make_links() {
     "$LOGGER" "Creating symbolic links for Python binaries and libraries..."
     for py in python pip idle pydoc; do
-        [ -e "\${PYTHON_INSTALL_PREFIX}/bin/\${py}" ] || ln -s "\${PYTHON_INSTALL_PREFIX}/bin/\${py}\${major_version}" "\${PYTHON_INSTALL_PREFIX}/bin/\${py}"
+        type "\${PYTHON_INSTALL_PREFIX}/bin/\${py}" >/dev/null 2>&1 || ln -s "\${py}\${major_version}" "\${PYTHON_INSTALL_PREFIX}/bin/\${py}"
     done
-    [ -e "\${PYTHON_INSTALL_PREFIX}/bin/python-config" ] || ln -s "\${PYTHON_INSTALL_PREFIX}/bin/python\${major_version}-config" "\${PYTHON_INSTALL_PREFIX}/bin/python-config"
+    type "\${PYTHON_INSTALL_PREFIX}/bin/python-config" >/dev/null 2>&1 || ln -s "python\${major_version}-config" "\${PYTHON_INSTALL_PREFIX}/bin/python-config"
 }
 
 update_env() {
@@ -193,26 +193,59 @@ update_alternatives() {
     for py in python pip idle pydoc; do
         priority=\$((\$( get_alternatives_priority "\$py" "\$major_version") + 1))
         [ "\$priority" -ge 0 ] || priority=\$((priority + 1))
-        syspy="\$(readlink -f "\${SYSTEM_PYTHON%/bin/python*}/bin/\${py}\${major_version}")"
-        [ ! -x "\$syspy" ] || update-alternatives --install "\${ALTERNATIVES_PATH}/\${py}\${major_version}" "\${py}\${major_version}" "\$syspy" "\$priority" && priority="\$((priority + 1))"
+        if [ "\${ALTERNATIVES_PATH}" != "\${PYTHON_INSTALL_PREFIX}/bin" ]; then
+            syspy="\$(readlink -f "\${SYSTEM_PYTHON%/bin/python*}/bin/\${py}\${major_minor_version}")"
+            if type "\$syspy" > /dev/null 2>&1; then
+                (set -x ; update-alternatives --install "\${ALTERNATIVES_PATH}/\${py}\${major_version}" "\${py}\${major_version}" "\$syspy" "\$priority" && priority="\$((priority + 1))")
+            fi
+        fi
+        [ "\$priority" -ge 1 ] || priority=\$((priority + 1))
         {
-            update-alternatives --install "\${ALTERNATIVES_PATH}/\${py}" "\${py}" "\${PYTHON_INSTALL_PREFIX}/bin/\${py}" "\$priority"
-            update-alternatives --install "\${ALTERNATIVES_PATH}/\${py}\${major_version}" "\${py}\${major_version}" "\${PYTHON_INSTALL_PREFIX}/bin/\${py}\${major_version}" "\$priority"
+            if type "\${PYTHON_INSTALL_PREFIX}/bin/\${py}" > /dev/null 2>&1 && ! type "\${ALTERNATIVES_PATH}/\${py}" >/dev/null 2>&1; then
+                (set -x ; update-alternatives --install "\${ALTERNATIVES_PATH}/\${py}" "\${py}" "\${PYTHON_INSTALL_PREFIX}/bin/\${py}" "\$priority")
+            fi
+            if type "\${PYTHON_INSTALL_PREFIX}/bin/\${py}\${major_version}" > /dev/null 2>&1 && ! type "\${ALTERNATIVES_PATH}/\${py}" >/dev/null 2>&1; then
+                (set -x ; update-alternatives --install "\${ALTERNATIVES_PATH}/\${py}" "\${py}" "\${PYTHON_INSTALL_PREFIX}/bin/\${py}\${major_version}" "\$priority")
+            fi
+            if type "\${PYTHON_INSTALL_PREFIX}/bin/\${py}\${major_version}" > /dev/null 2>&1 && ! type "\${ALTERNATIVES_PATH}/\${py}\${major_version}" >/dev/null 2>&1; then
+                (set -x ; update-alternatives --install "\${ALTERNATIVES_PATH}/\${py}\${major_version}" "\${py}\${major_version}" "\${PYTHON_INSTALL_PREFIX}/bin/\${py}\${major_version}" "\$priority")
+            fi
         } && priority="\$((priority + 1))"
     done
-    for py in python-config python\${major_version}-config; do
-        syspy="\$(readlink -f "\${SYSTEM_PYTHON%/bin/python*}/bin/\${py}")"
-        priority=\$((\$( get_alternatives_priority "\$py") + 1))
-        [ "\$priority" -ge 0 ] || priority=\$((priority + 1))
-        [ ! -x "\$syspy" ] || update-alternatives --install "\${ALTERNATIVES_PATH}/\${py}" "\${py}" "\$syspy" "\$priority" && priority="\$((priority + 1))"
-        update-alternatives --install "\${ALTERNATIVES_PATH}/\${py}" "\${py}" "\${PYTHON_INSTALL_PREFIX}/bin/\${py}" "\$priority" && priority="\$((priority + 1))"
+    for suffix in "-config"; do
+        prefix="python"
+        for version in \${major_minor_version}; do
+            tool="\${prefix}\${suffix}"
+            py_major="\${prefix}\${version%.*}\${suffix}"
+            py="\${prefix}\${version}\${suffix}"
+            priority=\$((\$( get_alternatives_priority "\$py") + 1))
+            [ "\$priority" -ge 0 ] || priority=\$((priority + 1))
+            if [ "\${ALTERNATIVES_PATH}" != "\${PYTHON_INSTALL_PREFIX}/bin" ]; then
+                syspy="\$(readlink -f "\${SYSTEM_PYTHON%/bin/python*}/bin/\${py}")"
+                if type "\$syspy" >/dev/null 2>&1; then
+                    (set -x ; update-alternatives --install "\${ALTERNATIVES_PATH}/\${py}" "\${py}" "\$syspy" "\$priority" && priority="\$((priority + 1))")
+                fi
+            fi
+            [ "\$priority" -ge 1 ] || priority=\$((priority + 1))
+            {
+                if type "\${PYTHON_INSTALL_PREFIX}/bin/\${py_major}" > /dev/null 2>&1 && ! type "\${ALTERNATIVES_PATH}/\${tool}" >/dev/null 2>&1; then
+                    (set -x ; update-alternatives --install "\${ALTERNATIVES_PATH}/\${tool}" "\${tool}" "\${PYTHON_INSTALL_PREFIX}/bin/\${py_major}" "\$priority")
+                fi
+                if type "\${PYTHON_INSTALL_PREFIX}/bin/\${py_major}" > /dev/null 2>&1 && ! type "\${ALTERNATIVES_PATH}/\${py}" >/dev/null 2>&1; then
+                    (set -x ; update-alternatives --install "\${ALTERNATIVES_PATH}/\${py}" "\${py}" "\${PYTHON_INSTALL_PREFIX}/bin/\${py_major}" "\$priority")
+                fi
+                if type "\${PYTHON_INSTALL_PREFIX}/bin/\${py}" > /dev/null 2>&1 && ! type "\${ALTERNATIVES_PATH}/\${py}" >/dev/null 2>&1; then
+                    (set -x ; update-alternatives --install "\${ALTERNATIVES_PATH}/\${py}" "\${py}" "\${PYTHON_INSTALL_PREFIX}/bin/\${py}" "\$priority")
+                fi
+            } && priority="\$((priority + 1))"
+        done
     done
 }
 
 install_tools() {
     "$LOGGER" "Installing Python tools: {\${PYTHON_TOOLS}}..."
     for tool in $PYTHON_TOOLS; do
-        [ ! -x "\${PYTHON_INSTALL_PREFIX}/bin/\${tool}" ] || continue
+        ! type "\${PYTHON_INSTALL_PREFIX}/bin/\${tool}" >/dev/null 2>&1 || continue
         LEVEL='*' "$LOGGER" "Installing Python tool: \${tool}..."
         "$PIP_INSTALL" "\${tool}"
     done
@@ -223,12 +256,12 @@ main() {
         update_env
     elif [ "\${1-}" = "true" ]; then
         $PIP_INSTALL --upgrade pip
-        make_links
+        # make_links
         update_alternatives
         [ "\${2:-false}" != "true" ] || install_tools
     else
         update_env
-        make_links
+        # make_links
         update_alternatives
     fi
 }

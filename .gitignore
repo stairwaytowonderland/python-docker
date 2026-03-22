@@ -30,3 +30,12 @@ infra/aws/**/cloudformation/**/.terraform.lock.hcl
 # PYTHON
 __pycache__/
 .venv/
+
+# Project-specific ignores
+test.sh
+*.bak
+*.old
+*.tmp
+*.private
+/.last
+/.command
