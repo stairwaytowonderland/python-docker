@@ -15,6 +15,7 @@ fi
 
 script_name="$0"
 script_dir="$(cd "$(dirname "$script_name")" && pwd)"
+
 # ---------------------------------------
 
 # Specify last argument as context if it's a directory
@@ -65,18 +66,36 @@ TIME_MSG_LABEL= TIME_MSG_PREFIX= TAG_PREFIX=3.12 $BUILD_CONTEXT/$bin_dir/build.s
 TIME_MSG_LABEL= TIME_MSG_PREFIX= TAG_PREFIX=3.12 $BUILD_CONTEXT/$bin_dir/publish.sh $REPO_NAME $REPO_NAMESPACE
 TIME_MSG_LABEL= TIME_MSG_PREFIX= TAG_PREFIX=3.12-perf $BUILD_CONTEXT/$bin_dir/build.sh $REPO_NAME $REMOTE_USER --build-arg PYTHON_VERSION=3.12 --build-arg ENABLE_OPTIMIZATIONS=true $* $BUILD_CONTEXT
 TIME_MSG_LABEL= TIME_MSG_PREFIX= TAG_PREFIX=3.12-perf $BUILD_CONTEXT/$bin_dir/publish.sh $REPO_NAME $REPO_NAMESPACE
-TIME_MSG_LABEL= TIME_MSG_PREFIX= TAG_PREFIX=3.12-dev $BUILD_CONTEXT/$bin_dir/build.sh $REPO_NAME $REMOTE_USER --build-arg PYTHON_VERSION=3.12 --build-arg PYTHON_DEV=true --build-arg ENABLE_BOLT=false $* $BUILD_CONTEXT
-TIME_MSG_LABEL= TIME_MSG_PREFIX= TAG_PREFIX=3.12-dev $BUILD_CONTEXT/$bin_dir/publish.sh $REPO_NAME $REPO_NAMESPACE
+TIME_MSG_LABEL= TIME_MSG_PREFIX= TAG_PREFIX=3.12-ext $BUILD_CONTEXT/$bin_dir/build.sh $REPO_NAME $REMOTE_USER --build-arg PYTHON_VERSION=3.12 --build-arg PYTHON_DEV=true --build-arg ENABLE_BOLT=false $* $BUILD_CONTEXT
+TIME_MSG_LABEL= TIME_MSG_PREFIX= TAG_PREFIX=3.12-ext $BUILD_CONTEXT/$bin_dir/publish.sh $REPO_NAME $REPO_NAMESPACE
 TIME_MSG_LABEL= TIME_MSG_PREFIX= TAG_PREFIX=3.13 $BUILD_CONTEXT/$bin_dir/build.sh $REPO_NAME $REMOTE_USER --build-arg PYTHON_VERSION=3.13 $* $BUILD_CONTEXT
 TIME_MSG_LABEL= TIME_MSG_PREFIX= TAG_PREFIX=3.13 $BUILD_CONTEXT/$bin_dir/publish.sh $REPO_NAME $REPO_NAMESPACE
 TIME_MSG_LABEL= TIME_MSG_PREFIX= TAG_PREFIX=3.14 $BUILD_CONTEXT/$bin_dir/build.sh $REPO_NAME $REMOTE_USER --build-arg PYTHON_VERSION=3.14 $* $BUILD_CONTEXT
 TIME_MSG_LABEL= TIME_MSG_PREFIX= TAG_PREFIX=3.14 $BUILD_CONTEXT/$bin_dir/publish.sh $REPO_NAME $REPO_NAMESPACE
 TIME_MSG_LABEL= TIME_MSG_PREFIX= TAG_PREFIX=3.14-perf $BUILD_CONTEXT/$bin_dir/build.sh $REPO_NAME $REMOTE_USER --build-arg PYTHON_VERSION=3.14 --build-arg ENABLE_OPTIMIZATIONS=true $* $BUILD_CONTEXT
 TIME_MSG_LABEL= TIME_MSG_PREFIX= TAG_PREFIX=3.14-perf $BUILD_CONTEXT/$bin_dir/publish.sh $REPO_NAME $REPO_NAMESPACE
-TIME_MSG_LABEL= TIME_MSG_PREFIX= TAG_PREFIX=3.14-dev $BUILD_CONTEXT/$bin_dir/build.sh $REPO_NAME $REMOTE_USER --build-arg PYTHON_VERSION=3.14 --build-arg PYTHON_DEV=true --build-arg ENABLE_BOLT=false $* $BUILD_CONTEXT
-TIME_MSG_LABEL= TIME_MSG_PREFIX= TAG_PREFIX=3.14-dev $BUILD_CONTEXT/$bin_dir/publish.sh $REPO_NAME $REPO_NAMESPACE
+TIME_MSG_LABEL= TIME_MSG_PREFIX= TAG_PREFIX=3.14-ext $BUILD_CONTEXT/$bin_dir/build.sh $REPO_NAME $REMOTE_USER --build-arg PYTHON_VERSION=3.14 --build-arg PYTHON_DEV=true --build-arg ENABLE_BOLT=false $* $BUILD_CONTEXT
+TIME_MSG_LABEL= TIME_MSG_PREFIX= TAG_PREFIX=3.14-ext $BUILD_CONTEXT/$bin_dir/publish.sh $REPO_NAME $REPO_NAMESPACE
 TIME_MSG_LABEL= TIME_MSG_PREFIX= LATEST=true TAG_PREFIX=latest $BUILD_CONTEXT/$bin_dir/build.sh $REPO_NAME $REMOTE_USER --build-arg PYTHON_VERSION=latest $* $BUILD_CONTEXT
 TIME_MSG_LABEL= TIME_MSG_PREFIX= LATEST=true TAG_PREFIX=latest $BUILD_CONTEXT/$bin_dir/publish.sh $REPO_NAME $REPO_NAMESPACE
+EOF
+
+    "${script_dir}/executer.sh" sh -c "$all_commands"
+}
+
+dhi() {
+    # Newline-separated list of commands to run
+    local all_commands=""
+    while IFS= read -r cmd || [ -n "$cmd" ]; do
+        [ -n "$cmd" ] || continue
+        [ -n "$all_commands" ] \
+            && all_commands="$all_commands && $cmd" \
+            || all_commands="$cmd"
+    done << EOF
+TIME_MSG_LABEL= TIME_MSG_PREFIX= TAG_PREFIX=3.12 $BUILD_CONTEXT/$bin_dir/build.sh $REPO_NAME $REMOTE_USER --build-arg PYTHON_VERSION=3.12 $* $BUILD_CONTEXT
+TIME_MSG_LABEL= TIME_MSG_PREFIX= TAG_PREFIX=3.12 $BUILD_CONTEXT/$bin_dir/publish.sh $REPO_NAME $REPO_NAMESPACE
+TIME_MSG_LABEL= TIME_MSG_PREFIX= TAG_PREFIX=3.14 $BUILD_CONTEXT/$bin_dir/build.sh $REPO_NAME $REMOTE_USER --build-arg PYTHON_VERSION=3.14 $* $BUILD_CONTEXT
+TIME_MSG_LABEL= TIME_MSG_PREFIX= TAG_PREFIX=3.14 $BUILD_CONTEXT/$bin_dir/publish.sh $REPO_NAME $REPO_NAMESPACE
 EOF
 
     "${script_dir}/executer.sh" sh -c "$all_commands"
@@ -89,9 +108,19 @@ for arg in "$@"; do
 done
 
 export TIME_MSG_LABEL="==> " TIME_MSG_PREFIX="TOTAL time"
+
+# shellcheck disable=SC2043
+for base_image in dhi:bookworm-debian12-dev; do
+    export BASE_IMAGE_NAME="${base_image%%:*}" BASE_IMAGE_VARIANT="${base_image##*:}"
+    echo "(*) Building and publishing Hardened images based on ${base_image}..." >&2
+    echo "BASE_IMAGE_NAME=${BASE_IMAGE_NAME}" >&2
+    echo "BASE_IMAGE_VARIANT=${BASE_IMAGE_VARIANT}" >&2
+    dhi "${com[@]}"
+done
+
 for base_image in debian:bookworm-slim ubuntu:latest; do
     export BASE_IMAGE_NAME="${base_image%%:*}" BASE_IMAGE_VARIANT="${base_image##*:}"
-    echo "(*) Building and publishing images based on ${base_image}..." >&2
+    echo "(*) Building and publishing Standard images based on ${base_image}..." >&2
     echo "BASE_IMAGE_NAME=${BASE_IMAGE_NAME}" >&2
     echo "BASE_IMAGE_VARIANT=${BASE_IMAGE_VARIANT}" >&2
     main "${com[@]}"

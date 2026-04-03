@@ -7,7 +7,7 @@
 
 # Supported Tags
 
-Tags follow the format `<python-version>[-<variant(def|perf)>][-<base-image-ref>]`.
+Tags follow the format `<python-version>[-<variant(ext|perf)>][-<base-image-ref>]`.
 
 > ℹ️ **Note**: If the *base-image* **variant** is `latest`, the `<base-image-ref>` refers to the *base-image* **name**,
 > otherwise
@@ -18,18 +18,27 @@ Tags follow the format `<python-version>[-<variant(def|perf)>][-<base-image-ref>
 > - If the *base-image* is `ubuntu:latest`, then `<base-image-ref>` will be **`ubuntu`** (the *base-image* **name**).
 > - If *base-image* is `debian:bookworm-slim`, then `<base-image-ref>` will be **`bookworm-slim`** (the *base-image* **variant**).
 
-| Ubuntu<br>(*`ubuntu:latest`*)                                                                                                                                | Debian<br>(*`debian:bookworm-slim`*)                                                                            | Python Version | Notes                                       |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- | -------------- | ------------------------------------------- |
-| [`latest`](https://hub.docker.com/layers/stairwaytowonderland/cpython/latest), [`ubuntu`](https://hub.docker.com/layers/stairwaytowonderland/cpython/ubuntu) | [`bookworm-slim`](https://hub.docker.com/layers/stairwaytowonderland/cpython/bookworm-slim)                     | latest         | Default build                               |
-| [`3.14-ubuntu`](https://hub.docker.com/layers/stairwaytowonderland/cpython/3.14-ubuntu)                                                                      | [`3.14-bookworm-slim`](https://hub.docker.com/layers/stairwaytowonderland/cpython/3.14-bookworm-slim)           | 3.14           | Standard build                              |
-| [`3.14-perf-ubuntu`](https://hub.docker.com/layers/stairwaytowonderland/cpython/3.14-perf-ubuntu)                                                            | [`3.14-perf-bookworm-slim`](https://hub.docker.com/layers/stairwaytowonderland/cpython/3.14-perf-bookworm-slim) | 3.14           | PGO-optimized (`ENABLE_OPTIMIZATIONS=true`) |
-| [`3.14-dev-ubuntu`](https://hub.docker.com/layers/stairwaytowonderland/cpython/3.14-dev-ubuntu)                                                              | [`3.14-dev-bookworm-slim`](https://hub.docker.com/layers/stairwaytowonderland/cpython/3.14-dev-bookworm-slim)   | 3.14           | Dev build with extended tooling             |
-| [`3.13-ubuntu`](https://hub.docker.com/layers/stairwaytowonderland/cpython/3.13-ubuntu)                                                                      | [`3.13-bookworm-slim`](https://hub.docker.com/layers/stairwaytowonderland/cpython/3.13-bookworm-slim)           | 3.13           | Standard build                              |
-| [`3.12-ubuntu`](https://hub.docker.com/layers/stairwaytowonderland/cpython/3.12-ubuntu)                                                                      | [`3.12-bookworm-slim`](https://hub.docker.com/layers/stairwaytowonderland/cpython/3.12-bookworm-slim)           | 3.12           | Standard build                              |
-| [`3.12-perf-ubuntu`](https://hub.docker.com/layers/stairwaytowonderland/cpython/3.12-perf-ubuntu)                                                            | [`3.12-perf-bookworm-slim`](https://hub.docker.com/layers/stairwaytowonderland/cpython/3.12-perf-bookworm-slim) | 3.12           | PGO-optimized (`ENABLE_OPTIMIZATIONS=true`) |
-| [`3.12-dev-ubuntu`](https://hub.docker.com/layers/stairwaytowonderland/cpython/3.12-dev-ubuntu)                                                              | [`3.12-dev-bookworm-slim`](https://hub.docker.com/layers/stairwaytowonderland/cpython/3.12-dev-bookworm-slim)   | 3.12           | Dev build with extended tooling             |
-| [`3.11-ubuntu`](https://hub.docker.com/layers/stairwaytowonderland/cpython/3.11-ubuntu)                                                                      | [`3.11-bookworm-slim`](https://hub.docker.com/layers/stairwaytowonderland/cpython/3.11-bookworm-slim)           | 3.11           | Standard build                              |
-| [`3.10-ubuntu`](https://hub.docker.com/layers/stairwaytowonderland/cpython/3.10-ubuntu)                                                                      | [`3.10-bookworm-slim`](https://hub.docker.com/layers/stairwaytowonderland/cpython/3.10-bookworm-slim)           | 3.10           | Standard build                              |
+## Standard Images
+
+| Ubuntu<br>(*`ubuntu:latest`*)                                                                                                                                      | Debian<br>(*`debian:bookworm-slim`*)                                                                            | Python Version | Notes                                                                                               |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- | -------------- | --------------------------------------------------------------------------------------------------- |
+| [`ubuntu`](https://hub.docker.com/layers/stairwaytowonderland/cpython/ubuntu), [`latest`](https://hub.docker.com/layers/stairwaytowonderland/cpython/latest)       | [`bookworm-slim`](https://hub.docker.com/layers/stairwaytowonderland/cpython/bookworm-slim)                     | latest         | Default build; uses the **latest** tagged version of Python, which could be unstable (alpha or rc). |
+| [`3.14`](https://hub.docker.com/layers/stairwaytowonderland/cpython/3.14), [`3.14-ubuntu`](https://hub.docker.com/layers/stairwaytowonderland/cpython/3.14-ubuntu) | [`3.14-bookworm-slim`](https://hub.docker.com/layers/stairwaytowonderland/cpython/3.14-bookworm-slim)           | 3.14           | Standard build                                                                                      |
+| [`3.14-perf-ubuntu`](https://hub.docker.com/layers/stairwaytowonderland/cpython/3.14-perf-ubuntu)                                                                  | [`3.14-perf-bookworm-slim`](https://hub.docker.com/layers/stairwaytowonderland/cpython/3.14-perf-bookworm-slim) | 3.14           | PGO-optimized (`ENABLE_OPTIMIZATIONS=true`)                                                         |
+| [`3.14-ext-ubuntu`](https://hub.docker.com/layers/stairwaytowonderland/cpython/3.14-ext-ubuntu)                                                                    | [`3.14-ext-bookworm-slim`](https://hub.docker.com/layers/stairwaytowonderland/cpython/3.14-ext-bookworm-slim)   | 3.14           | Dev build with extended tooling                                                                     |
+| [`3.13`](https://hub.docker.com/layers/stairwaytowonderland/cpython/3.13), [`3.13-ubuntu`](https://hub.docker.com/layers/stairwaytowonderland/cpython/3.13-ubuntu) | [`3.13-bookworm-slim`](https://hub.docker.com/layers/stairwaytowonderland/cpython/3.13-bookworm-slim)           | 3.13           | Standard build                                                                                      |
+| [`3.12`](https://hub.docker.com/layers/stairwaytowonderland/cpython/3.12), [`3.12-ubuntu`](https://hub.docker.com/layers/stairwaytowonderland/cpython/3.12-ubuntu) | [`3.12-bookworm-slim`](https://hub.docker.com/layers/stairwaytowonderland/cpython/3.12-bookworm-slim)           | 3.12           | Standard build                                                                                      |
+| [`3.12-perf-ubuntu`](https://hub.docker.com/layers/stairwaytowonderland/cpython/3.12-perf-ubuntu)                                                                  | [`3.12-perf-bookworm-slim`](https://hub.docker.com/layers/stairwaytowonderland/cpython/3.12-perf-bookworm-slim) | 3.12           | PGO-optimized (`ENABLE_OPTIMIZATIONS=true`)                                                         |
+| [`3.12-ext-ubuntu`](https://hub.docker.com/layers/stairwaytowonderland/cpython/3.12-ext-ubuntu)                                                                    | [`3.12-ext-bookworm-slim`](https://hub.docker.com/layers/stairwaytowonderland/cpython/3.12-ext-bookworm-slim)   | 3.12           | Dev build with extended tooling                                                                     |
+| [`3.11`](https://hub.docker.com/layers/stairwaytowonderland/cpython/3.11), [`3.11-ubuntu`](https://hub.docker.com/layers/stairwaytowonderland/cpython/3.11-ubuntu) | [`3.11-bookworm-slim`](https://hub.docker.com/layers/stairwaytowonderland/cpython/3.11-bookworm-slim)           | 3.11           | Standard build                                                                                      |
+| [`3.10`](https://hub.docker.com/layers/stairwaytowonderland/cpython/3.10), [`3.10-ubuntu`](https://hub.docker.com/layers/stairwaytowonderland/cpython/3.10-ubuntu) | [`3.10-bookworm-slim`](https://hub.docker.com/layers/stairwaytowonderland/cpython/3.10-bookworm-slim)           | 3.10           | Standard build                                                                                      |
+
+## Hardened Images
+
+| Debian<br>(*`dhi.io/debian-base:bookworm-debian12-dev`*)                                                              | Python Version | Notes          |
+| --------------------------------------------------------------------------------------------------------------------- | -------------- | -------------- |
+| [`3.12-bookworm-debian12-dev`](https://hub.docker.com/layers/stairwaytowonderland/cpython/3.12-bookworm-debian12-dev) | 3.12           | Standard build |
+| [`3.14-bookworm-debian12-dev`](https://hub.docker.com/layers/stairwaytowonderland/cpython/3.14-bookworm-debian12-dev) | 3.14           | Standard build |
 
 # Supported Platforms
 
@@ -40,10 +49,11 @@ Tags follow the format `<python-version>[-<variant(def|perf)>][-<base-image-ref>
 
 All images are built on top of Debian-based base images. The default base is `ubuntu:latest`.
 
-| Base Image | Variant         |
-| ---------- | --------------- |
-| `ubuntu`   | `latest`        |
-| `debian`   | `bookworm-slim` |
+| Base Image | Variant                 |
+| ---------- | ----------------------- |
+| `dhi`      | `bookworm-debian12-dev` |
+| `ubuntu`   | `latest`                |
+| `debian`   | `bookworm-slim`         |
 
 > ℹ️ **Note**: The Dockerfile requires a Debian-based image. Other Debian-derived distributions may be used via the
 > `IMAGE_NAME` and `VARIANT` build arguments.
@@ -122,7 +132,7 @@ docker run --rm \
   python3 your-daemon-or-script.py
 ```
 
-# Image Variants
+# Standard Image Variants
 
 ## `cpython:<version>-ubuntu`
 
@@ -143,11 +153,20 @@ enabled (`ENABLE_OPTIMIZATIONS=true`). PGO uses runtime profiling data collected
 CPython binary. Recommended for production workloads where CPU performance matters. Available for both `ubuntu` and
 `bookworm-slim` base variants.
 
-## `cpython:<version>-dev-<base-image-ref>`
+## `cpython:<version>-ext-<base-image-ref>`
 
 A development-oriented build with extended tooling included (`PYTHON_DEV=true`). Intended for use in development
 environments and dev containers where additional build tools and libraries may be needed. Available for both `ubuntu` and
 `bookworm-slim` base variants.
+
+# Hardened Image Variants (DHI)
+
+## `cpython:<version>-bookworm-debian12-dev`
+
+Built on [`dhi.io/debian-base:bookworm-debian12-dev`](https://dhi.io). This is the default base image for this project —
+a custom Debian 12 (Bookworm) base image maintained by [dhi.io](https://dhi.io), purpose-built for Debian-based container
+workflows. It provides a curated, dev-friendly foundation with common tooling pre-installed, making it well-suited for
+both development and CI environments.
 
 # What is this project?
 

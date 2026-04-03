@@ -7,6 +7,25 @@ if [ "${#com[@]}" -eq 0 ]; then
     exit 1
 fi
 
+# Handle exit
+__quit() { printf "🐬 %s 🐬\n" "So long, and thanks for all the fish" >&2; }
+
+# Handle cancelled operations (e.g., Ctrl+C)
+__control_c() {
+    _err=$?
+    trap __quit EXIT
+    _bold="\033[1m"
+    _color="\033[00;91m"
+    _color_bold="\033[01;91m"
+    _color_reset="\033[0m"
+    echo -e "⛔ ${_color_bold}✗${_color_reset} ${_color}(${_err})${_color_reset} ${_color_bold}Operation cancelled by user${_color_reset} ⛔" >&2
+    kill -INT 0 2> /dev/null
+    # SIGINT expected to exit with 130 (128 + SIGINT(2)) — the conventional exit code for Ctrl+C termination — but some environments may return 143 or other codes
+    exit $_err
+}
+
+trap __control_c INT
+
 printf "\033[95;1m§ %s\033[0m\n" "${com[*]}" >&2
 
 DEFAULT_TIME_MSG_LABEL="${DEFAULT_TIME_MSG_LABEL-}"

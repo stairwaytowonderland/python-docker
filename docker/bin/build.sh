@@ -57,14 +57,13 @@ fi
 # ---------------------------------------
 
 DEFAULT_TARGET="${DEFAULT_TARGET:-base}"
-BASE_IMAGE_NAME="${BASE_IMAGE_NAME:-ubuntu}"
+DEFAULT_BASE_IMAGE_NAME="${DEFAULT_BASE_IMAGE_NAME:-ubuntu}"
+BASE_IMAGE_NAME="${BASE_IMAGE_NAME:-$DEFAULT_BASE_IMAGE_NAME}"
 BASE_IMAGE_VARIANT="${BASE_IMAGE_VARIANT:-latest}"
 DEFAULT_PLATFORM="linux/$(uname -m)"
-FILEZ_TARGET="${FILEZ_TARGET:-filez}"
 [ "$BASE_IMAGE_VARIANT" = "latest" ] \
     && BASE_IMAGE_REF="$BASE_IMAGE_NAME" \
     || BASE_IMAGE_REF="${BASE_IMAGE_VARIANT}"
-LATEST_TARGET="${LATEST_TARGET:-$DEFAULT_TARGET}"
 REGISTRY_HOST="${REGISTRY_HOST:-registry-1.docker.io}"
 REGISTRY_PROVIDER="${REGISTRY_PROVIDER:-Docker Hub}"
 REPO_NAMESPACE="${REPO_NAMESPACE-}"
@@ -95,32 +94,39 @@ DOCKER_TARGET="${DOCKER_TARGET:-$DEFAULT_TARGET}"
 REMOTE_USER="${REMOTE_USER:-$second_arg}"
 TAG_SUFFIX="${TAG_SUFFIX:-$DOCKER_TARGET}"
 [ -n "${TAG_PREFIX-}" ] && TAG_SUFFIX="$DOCKER_TARGET" || TAG_PREFIX="$DOCKER_TARGET"
-if [ "$DOCKER_TARGET" = "$FILEZ_TARGET" ]; then
-    build_tag="${TAG_PREFIX}"
-else
-    build_tag="${IMAGE_NAME}:${BASE_IMAGE_REF}"
-    if [ "$BASE_IMAGE_VARIANT" = "latest" ] || [ -n "$TAG_PREFIX" ]; then
-        tag_prefix="${IMAGE_NAME}:${TAG_PREFIX}"
-        build_tag="${tag_prefix}-${BASE_IMAGE_REF}"
-    fi
+build_tag="${IMAGE_NAME}:${BASE_IMAGE_REF}"
 
-    if [ "$TAG_PREFIX" = "latest" ]; then
-        build_tag="${IMAGE_NAME}:${BASE_IMAGE_REF}"
-    fi
+if [ "$BASE_IMAGE_VARIANT" = "latest" ] || [ -n "$TAG_PREFIX" ]; then
+    tag_prefix="${IMAGE_NAME}:${TAG_PREFIX}"
+    build_tag="${tag_prefix}-${BASE_IMAGE_REF}"
+fi
+
+if [ "$TAG_PREFIX" = "latest" ]; then
+    build_tag="${IMAGE_NAME}:${BASE_IMAGE_REF}"
 fi
 
 [ "$TAG_SUFFIX" = "$DEFAULT_TARGET" ] || build_tag="${build_tag}-${TAG_SUFFIX}"
 
-if [ -z "${latest_tag-}" ] && [ "$DOCKER_TARGET" = "$LATEST_TARGET" ] && [ "${LATEST:-false}" = "true" ]; then
-    echo "(*) Also tagging with 'latest'..." >&2
-    latest_tag="${IMAGE_NAME}:latest"
-fi
-
 dockerfile_path="${BUILD_CONTEXT}/docker/Dockerfile"
+tag_variant=$(echo "$TAG_PREFIX" | cut -d- -f2-)
 
 if [ ! -f "$dockerfile_path" ]; then
     echo "(!) Dockerfile not found at expected path: ${dockerfile_path}" >&2
     exit 1
+fi
+
+echo "(*) Building Docker image for ${build_tag}..." >&2
+
+if [ -z "${version_tag-}" ] && [ "$BASE_IMAGE_NAME" = "$DEFAULT_BASE_IMAGE_NAME" ] && [ "$DOCKER_TARGET" = "$DEFAULT_TARGET" ] && [ "${LATEST:-false}" != "true" ]; then
+    if [ "$tag_variant" != "ext" ] && [ "$tag_variant" != "perf" ]; then
+        echo -n "(*) Also tagging with version ... " >&2
+        version_tag="${IMAGE_NAME}:${TAG_PREFIX}"
+        echo "'${version_tag}'" >&2
+    fi
+elif [ -z "${latest_tag-}" ] && [ "$DOCKER_TARGET" = "$DEFAULT_TARGET" ] && [ "${LATEST:-false}" = "true" ]; then
+    echo -n "(*) Also tagging with latest ... " >&2
+    latest_tag="${IMAGE_NAME}:latest"
+    echo "'${latest_tag}'" >&2
 fi
 
 echo "(*) Building Docker image for ${DOCKER_TARGET}..." >&2
@@ -131,9 +137,8 @@ com+=("-f" "${dockerfile_path}")
 com+=("--label" "org.opencontainers.image.ref.name=${build_tag}")
 com+=("--target" "${DOCKER_TARGET}")
 com+=("-t" "${build_tag}")
-if [ -n "${latest_tag-}" ]; then
-    com+=("-t" "${latest_tag}")
-fi
+[ -z "${version_tag-}" ] || com+=("-t" "${version_tag}")
+[ -z "${latest_tag-}" ] || com+=("-t" "${latest_tag}")
 com+=("--platform=$(dedupe "${PLATFORM:-$DEFAULT_PLATFORM}")")
 # The `debian:bookworm-slim` image provides a minimal base for development containers
 com_arg=()

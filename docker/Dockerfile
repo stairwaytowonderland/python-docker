@@ -1,7 +1,7 @@
 # Must be debian-based image
 ARG IMAGE_NAME=ubuntu
 ARG VARIANT=${VARIANT:-latest}
-ARG PARENT_IMAGE=${IMAGE_NAME}:${VARIANT}
+# ARG PARENT_IMAGE=${IMAGE_NAME}:${VARIANT}
 ARG PYTHON_VERSION=latest
 ARG INSTALL_TOOLS=false
 ARG PYTHON_DEV=false
@@ -12,108 +12,14 @@ ARG LOGGER=$SCRIPT_PATH/logger.sh
 ARG PIP_INSTALL=$SCRIPT_PATH/pip-install.sh
 ARG INSTALL_HELPER=$SCRIPT_PATH/install-helper.sh
 ARG MAKEFLAGS="-j 8 --no-print-directory"
-FROM $PARENT_IMAGE AS debug
+FROM dhi.io/debian-base:${VARIANT} AS dhi
+FROM ubuntu:${VARIANT} AS ubuntu
+FROM debian:${VARIANT} AS debian
+
+
+FROM $IMAGE_NAME AS builder
 
 ARG IMAGE_NAME \
-    PARENT_IMAGE \
-    PYTHON_VERSION \
-    PYTHON_INSTALL_PREFIX \
-    PYTHON_INSTALL_PATH \
-    INSTALL_TOOLS \
-    SCRIPT_PATH \
-    LOGGER \
-    PIP_INSTALL \
-    INSTALL_HELPER \
-    TIMEZONE=UTC \
-    USERNAME=appuser \
-    USER_UID=1000 \
-    USER_GID=1000 \
-    MAKEFLAGS \
-    PYTHON_DEV  \
-    LLVM_VERSION=18 \
-    ENABLE_PRE_RELEASE=false \
-    ENABLE_SHARED=true \
-    ENABLE_OPTIMIZATIONS=false \
-    UPDATE_PACKAGES=false \
-    UPGRADE_DIST=$PYTHON_DEV \
-    ENABLE_BOLT=$PYTHON_DEV \
-    UPDATE_NCURSES=$PYTHON_DEV \
-    UPDATE_READLINE=$PYTHON_DEV \
-    SYSTEM_INSTALL_PREFIX=/usr \
-    PIP_INSTALL_FLAGS="--no-cache-dir --disable-pip-version-check --break-system-packages --root-user-action=ignore" \
-    PYTHON_TOOLS="pipx poetry uv"
-
-
-# Set non-interactive mode for apt-get to avoid prompts during package installation
-ENV DEBIAN_FRONTEND=noninteractive \
-    # Prevent Python from writing .pyc files (keeps source code directories free of __pycache__ folders and .pyc files)
-    PYTHONDONTWRITEBYTECODE=1 \
-    # Ensure Python output is sent straight to the terminal without buffering (important for logging)
-    PYTHONUNBUFFERED=1 \
-    # Custom environment variables for debugging the builder stage
-    PYTHON_VERSION=$PYTHON_VERSION \
-    PYTHON_INSTALL_PREFIX=$PYTHON_INSTALL_PREFIX \
-    PYTHON_INSTALL_PATH=$PYTHON_INSTALL_PATH \
-    INSTALL_TOOLS=$INSTALL_TOOLS \
-    SCRIPT_PATH=$SCRIPT_PATH \
-    PYTHON_DEV=$PYTHON_DEV \
-    LOGGER=$LOGGER \
-    PIP_INSTALL=$PIP_INSTALL \
-    INSTALL_HELPER=$INSTALL_HELPER \
-    PIP_INSTALL_FLAGS="$PIP_INSTALL_FLAGS" \
-    MAKEFLAGS="$MAKEFLAGS" \
-    LLVM_VERSION=$LLVM_VERSION \
-    ENABLE_PRE_RELEASE=$ENABLE_PRE_RELEASE \
-    ENABLE_SHARED=$ENABLE_SHARED \
-    ENABLE_OPTIMIZATIONS=$ENABLE_OPTIMIZATIONS \
-    ENABLE_BOLT=$ENABLE_BOLT \
-    SYSTEM_INSTALL_PREFIX=$SYSTEM_INSTALL_PREFIX \
-    UPDATE_NCURSES=$UPDATE_NCURSES \
-    UPDATE_READLINE=$UPDATE_READLINE \
-    UPDATE_PACKAGES=$UPDATE_PACKAGES
-
-# Copy library scripts, utilities, and helpers for installing Python and dependencies.
-# These will be used in this builder stage to install Python, and then copied to subsequent stages as needed.
-COPY --chmod=755 docker/utils/logger.sh $LOGGER
-COPY docker/helpers/install-helper.sh $INSTALL_HELPER
-
-USER root
-
-RUN \
-  PACKAGES_TO_INSTALL="ca-certificates build-essential wget pkg-config checkinstall git openssl" \
-  && PACKAGES_TO_KEEP="openssl" \
-  && { [ "$PYTHON_DEV" = "true" ] || PACKAGES_TO_REMOVE="linux-libc-dev"; } \
-  && apt-get update \
-  && apt-get install -y --no-install-recommends $PACKAGES_TO_INSTALL
-    # Either already included or installded as a dependency (probably of build-essential),
-    # but listed here for clarity and to ensure availability for the Python installation process
-    # gcc \
-    # make \
-    # tar \
-    # xz-utils \
-
-COPY --chmod=755 docker/lib-scripts/ncurses-install.sh docker/lib-scripts/readline-install.sh $SCRIPT_PATH/
-
-RUN \
-  { [ "$UPGRADE_DIST" != "true" ] || apt-get -s dist-upgrade | grep "^Inst" | grep -i securi | cut -d " " -f 2 | xargs apt-get install -y --no-install-recommends; }
-
-RUN \
-   { [ "$UPDATE_NCURSES" != "true" ] || $SCRIPT_PATH/ncurses-install.sh; } \
-  && { [ "$UPDATE_READLINE" != "true" ] || $SCRIPT_PATH/readline-install.sh; }
-
-COPY --chmod=755 docker/lib-scripts/python-install.sh $SCRIPT_PATH/
-
-ARG INSTALL_PYTHON=true
-RUN \
-  if [ "$INSTALL_PYTHON" = "true" ]; then \
-    $SCRIPT_PATH/python-install.sh; \
-  fi
-
-
-FROM $PARENT_IMAGE AS builder
-
-ARG IMAGE_NAME \
-    PARENT_IMAGE \
     PYTHON_VERSION \
     PYTHON_INSTALL_PREFIX \
     PYTHON_INSTALL_PATH \
@@ -151,6 +57,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # COPY --chmod=755 docker/lib-scripts/*-install.sh /tmp/lib-scripts/
 # COPY --chmod=755 docker/utils/logger.sh $LOGGER
 # COPY docker/helpers/install-helper.sh $INSTALL_HELPER
+# * Copy everything to $SCRIPT_PATH to reduce the number of layers
 COPY --chmod=755 docker/utils/*.sh docker/helpers/*.sh docker/lib-scripts/*.sh $SCRIPT_PATH/
 
 USER root

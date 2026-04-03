@@ -27,10 +27,10 @@ first_arg="${1-}"
 # ---------------------------------------
 
 DEFAULT_TARGET="${DEFAULT_TARGET:-base}"
-LATEST_TARGET="${LATEST_TARGET:-$DEFAULT_TARGET}"
+DEFAULT_BASE_IMAGE_NAME="${DEFAULT_BASE_IMAGE_NAME:-ubuntu}"
 REGISTRY_HOST="${REGISTRY_HOST:-registry-1.docker.io}"
 
-BASE_IMAGE_NAME="${BASE_IMAGE_NAME:-ubuntu}"
+BASE_IMAGE_NAME="${BASE_IMAGE_NAME:-$DEFAULT_BASE_IMAGE_NAME}"
 BASE_IMAGE_VARIANT="${BASE_IMAGE_VARIANT:-latest}"
 DEFAULT_PLATFORM="linux/$(uname -m)"
 FILEZ_TARGET="${FILEZ_TARGET:-filez}"
@@ -69,32 +69,33 @@ IMAGE_VERSION="${IMAGE_VERSION:-latest}"
 TAG_SUFFIX="${TAG_SUFFIX:-$DOCKER_TARGET}"
 [ -n "${TAG_PREFIX-}" ] && TAG_SUFFIX="$DOCKER_TARGET" || TAG_PREFIX="$DOCKER_TARGET"
 title_prefix="${REPO_NAME} - ${DOCKER_TARGET}"
-if [ "$DOCKER_TARGET" = "$FILEZ_TARGET" ]; then
-    build_tag="${TAG_PREFIX}"
-    docker_tag="${IMAGE_NAME}:${build_tag}"
-else
-    title_suffix=" - ${BASE_IMAGE_NAME} - ${BASE_IMAGE_VARIANT}"
-    build_tag="${IMAGE_NAME}:${BASE_IMAGE_REF}"
-    if [ "$BASE_IMAGE_VARIANT" = "latest" ] || [ -n "$TAG_PREFIX" ]; then
-        tag_prefix="${IMAGE_NAME}:${TAG_PREFIX}"
-        build_tag="${tag_prefix}-${BASE_IMAGE_REF}"
-    fi
-
-    if [ "$TAG_PREFIX" = "latest" ]; then
-        build_tag="${IMAGE_NAME}:${BASE_IMAGE_REF}"
-    fi
-
-    [ "$TAG_SUFFIX" = "$DEFAULT_TARGET" ] || build_tag="${build_tag}-${TAG_SUFFIX}"
-
-    [ "$IMAGE_VERSION" = "latest" ] || build_tag="${build_tag}-${IMAGE_VERSION}"
-
-    if [ "$DOCKER_TARGET" = "$LATEST_TARGET" ] && [ "${LATEST:-false}" = "true" ]; then
-        latest_tag="${IMAGE_NAME}:latest"
-        # build_tag="$LATEST_TAG"
-    fi
-
-    docker_tag="$build_tag"
+title_suffix=" - ${BASE_IMAGE_NAME} - ${BASE_IMAGE_VARIANT}"
+build_tag="${IMAGE_NAME}:${BASE_IMAGE_REF}"
+if [ "$BASE_IMAGE_VARIANT" = "latest" ] || [ -n "$TAG_PREFIX" ]; then
+    tag_prefix="${IMAGE_NAME}:${TAG_PREFIX}"
+    build_tag="${tag_prefix}-${BASE_IMAGE_REF}"
 fi
+
+if [ "$TAG_PREFIX" = "latest" ]; then
+    build_tag="${IMAGE_NAME}:${BASE_IMAGE_REF}"
+fi
+
+[ "$TAG_SUFFIX" = "$DEFAULT_TARGET" ] || build_tag="${build_tag}-${TAG_SUFFIX}"
+
+[ "$IMAGE_VERSION" = "latest" ] || build_tag="${build_tag}-${IMAGE_VERSION}"
+
+tag_variant=$(echo "$TAG_PREFIX" | cut -d- -f2-)
+
+if [ "$DOCKER_TARGET" = "$DEFAULT_TARGET" ] && [ "${LATEST:-false}" = "true" ]; then
+    latest_tag="${IMAGE_NAME}:latest"
+    # build_tag="$LATEST_TAG"
+elif [ "$BASE_IMAGE_NAME" = "$DEFAULT_BASE_IMAGE_NAME" ] && [ "$DOCKER_TARGET" = "$DEFAULT_TARGET" ] && [ "${LATEST:-false}" != "true" ]; then
+    if [ "$tag_variant" != "ext" ] && [ "$tag_variant" != "perf" ]; then
+        version_tag="${IMAGE_NAME}:${TAG_PREFIX}"
+    fi
+fi
+
+docker_tag="$build_tag"
 
 # * Registry login happens here
 if ! . "${script_dir}/login.sh" "${REGISTRY_USER:-$REPO_NAMESPACE}" "$REPO_NAME"; then
@@ -186,6 +187,17 @@ if [ "${BUILDX_PUSH:-true}" != "true" ]; then
 
         set -- "${com[@]}"
         . "${script_dir}/executer.sh" "$@"
+    elif [ -n "${version_tag-}" ]; then
+        REGISTRY_URL="${REGISTRY_URL_PREFIX}/${version_tag}"
+
+        echo "(*) Tagging with version tag '${version_tag-}'..." >&2
+        tag_image "$build_tag" "$REGISTRY_URL"
+
+        com=(docker push)
+        com+=("$REGISTRY_URL")
+
+        set -- "${com[@]}"
+        . "${script_dir}/executer.sh" "$@"
     fi
 fi
 
@@ -211,9 +223,8 @@ echo "(∫) Adding annotations to ${REGISTRY_URL} ..." >&2
 # https://github.com/opencontainers/image-spec/blob/main/annotations.md#pre-defined-annotation-keys
 com=(docker buildx imagetools create)
 com+=("-t" "${REGISTRY_URL}")
-if [ -n "${latest_tag-}" ]; then
-    com+=("-t" "${REGISTRY_URL_PREFIX}/${latest_tag}")
-fi
+[ -z "${version_tag-}" ] || com+=("-t" "${REGISTRY_URL_PREFIX}/${version_tag}")
+[ -z "${latest_tag-}" ] || com+=("-t" "${REGISTRY_URL_PREFIX}/${latest_tag}")
 # https://specs.opencontainers.org/image-spec/annotations/
 com+=("--annotation" "${annotation_prefix}org.opencontainers.image.description=${image_description//\\\`/\`}")
 com+=("--annotation" "${annotation_prefix}org.opencontainers.image.title=${image_title%.}${title_arch# }")
