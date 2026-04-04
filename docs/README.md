@@ -183,7 +183,7 @@ container-based workflows.
 
 > 🌐 [github.com/stairwaytowonderland/cpython](https://github.com/stairwaytowonderland/cpython)
 
-![logo](https://raw.githubusercontent.com/stairwaytowonderland/cpython/refs/heads/main/docs/assets/bee.png)
+![logo](https://raw.githubusercontent.com/stairwaytowonderland/cpython/refs/heads/main/docs/assets/beesmall.png)
 
 # License
 
