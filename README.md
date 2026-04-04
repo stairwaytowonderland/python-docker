@@ -8,7 +8,7 @@ container-based workflows.
 
 Container repo hosted in [Docker Hub](https://hub.docker.com/repository/docker/stairwaytowonderland/cpython).
 
-See the [docker](./docker/README.md) documentation for more details.
+See the detailed [**docs**](./docs/README.md) for more details.
 
 ---
 
