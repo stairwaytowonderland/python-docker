@@ -1,12 +1,9 @@
 # 🐳 Quick Reference
 
-- **`Dockerfile`**:<br>[github.com/stairwaytowonderland/cpython/blob/main/docker/Dockerfile](https://github.com/stairwaytowonderland/cpython/blob/main/docker/Dockerfile)<br><br>
-- **GitHub Repository**:<br>[github.com/stairwaytowonderland/cpython](https://github.com/stairwaytowonderland/cpython)<br><br>
-- **Docker Hub**: [stairwaytowonderland/cpython](https://hub.docker.com/r/stairwaytowonderland/cpython)<br><br>
-- **Maintained by**: [Andrew Haller](https://github.com/andrewhaller)<br><br>
-- **License**: [MIT](https://github.com/stairwaytowonderland/cpython/blob/main/LICENSE)
+- **Maintained by**:<br>[Andrew Haller](https://github.com/andrewhaller)
+- **License**:<br>[MIT](https://github.com/stairwaytowonderland/cpython/blob/main/LICENSE)
 
-# Supported Tags
+# Supported tags and respective *Docker Hub* links
 
 Tags follow the format `<python-version>[-<variant(ext|perf)>][-<base-image-ref>]`.
 
@@ -41,6 +38,12 @@ Tags follow the format `<python-version>[-<variant(ext|perf)>][-<base-image-ref>
 | --------------------------------------------------------------------------------------------------------------------- | -------------- | -------------- |
 | [`3.12-bookworm-debian12-dev`](https://hub.docker.com/layers/stairwaytowonderland/cpython/3.12-bookworm-debian12-dev) | 3.12           | Standard build |
 | [`3.14-bookworm-debian12-dev`](https://hub.docker.com/layers/stairwaytowonderland/cpython/3.14-bookworm-debian12-dev) | 3.14           | Standard build |
+
+# Quick reference (cont.)
+
+- **Source `Dockerfile`**:<br>[github.com/stairwaytowonderland/cpython/blob/main/docker/Dockerfile](https://github.com/stairwaytowonderland/cpython/blob/main/docker/Dockerfile)
+- **GitHub Repository**:<br>[github.com/stairwaytowonderland/cpython](https://github.com/stairwaytowonderland/cpython)
+- **Docker Hub**:<br>[stairwaytowonderland/cpython](https://hub.docker.com/r/stairwaytowonderland/cpython)
 
 # Supported Platforms
 
@@ -79,7 +82,7 @@ COPY . .
 CMD [ "python", "./your-daemon-or-script.py" ]
 ```
 
-## Building the Image
+## Building the image
 
 Clone the repository and use the provided build script from the project root:
 
@@ -110,7 +113,7 @@ docker build \
   .
 ```
 
-## Running a Python Command
+## Running a Python command
 
 Run a one-off Python command using the image:
 
@@ -124,7 +127,7 @@ Run an interactive Python shell:
 docker run -it --rm stairwaytowonderland/cpython:3.14-ubuntu python3
 ```
 
-## Running a Single Python Script
+## Running a single Python script
 
 ```bash
 docker run --rm \
