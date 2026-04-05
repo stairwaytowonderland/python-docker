@@ -100,16 +100,18 @@ fi
 
 docker_tag="$build_tag"
 
-# * Registry login happens here
-if ! . "${script_dir}/login.sh" "${REGISTRY_USER:-$REPO_NAMESPACE}" "$REPO_NAME"; then
-    echo "Error: Not logged in to ${REGISTRY_PROVIDER} Container Registry." >&2
-    exit 1
-elif [ -z "$REGISTRY_URL_PREFIX" ]; then
-    echo "Error: REGISTRY_URL_PREFIX is not set." >&2
-    exit 1
-fi
+if [ "${NO_PUSH:-false}" != "true" ]; then
+    # * Registry login happens here
+    if ! . "${script_dir}/login.sh" "${REGISTRY_USER:-$REPO_NAMESPACE}" "$REPO_NAME"; then
+        echo "Error: Not logged in to ${REGISTRY_PROVIDER} Container Registry." >&2
+        exit 1
+    elif [ -z "$REGISTRY_URL_PREFIX" ]; then
+        echo "Error: REGISTRY_URL_PREFIX is not set." >&2
+        exit 1
+    fi
 
-REGISTRY_URL="${REGISTRY_URL_PREFIX}/${docker_tag}"
+    REGISTRY_URL="${REGISTRY_URL_PREFIX}/${docker_tag}"
+fi
 
 capitalize() {
     printf "%s" "$1" | awk '{print toupper(substr($0,1,1)) tolower(substr($0,2))}' | tr -d '\n'
@@ -140,101 +142,103 @@ tag_image() {
     echo -e "\033[2m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\033[0m" >&2
 }
 
-IFS="," read -r -a platforms <<< "${PLATFORM:-$DEFAULT_PLATFORM}"
-description_arch=""
-title_arch=""
-multiarch=false
-annotation_prefix="index:"
-if [ ${#platforms[*]} -gt 1 ]; then
-    multiarch=true
+if [ "${NO_PUSH:-false}" != "true" ]; then
+    IFS="," read -r -a platforms <<< "${PLATFORM:-$DEFAULT_PLATFORM}"
+    description_arch=""
+    title_arch=""
+    multiarch=false
     annotation_prefix="index:"
-    # if echo "${platforms[*]}" | grep -q "linux/amd64"; then
-    #     #     annotation_prefix="manifest[linux/amd64]:"
-    #     description_arch="Built for AMD64."
-    #     title_arch=" - AMD64"
-    # elif echo "${platforms[*]}" | grep -q "linux/arm64"; then
-    #     #     annotation_prefix="manifest[linux/arm64]:"
-    #     description_arch="Built for ARM64."
-    #     title_arch=" - ARM64"
-    # fi
-fi
+    if [ ${#platforms[*]} -gt 1 ]; then
+        multiarch=true
+        annotation_prefix="index:"
+        # if echo "${platforms[*]}" | grep -q "linux/amd64"; then
+        #     #     annotation_prefix="manifest[linux/amd64]:"
+        #     description_arch="Built for AMD64."
+        #     title_arch=" - AMD64"
+        # elif echo "${platforms[*]}" | grep -q "linux/arm64"; then
+        #     #     annotation_prefix="manifest[linux/arm64]:"
+        #     description_arch="Built for ARM64."
+        #     title_arch=" - ARM64"
+        # fi
+    fi
 
-base_image_name_cap="$(capitalize "$BASE_IMAGE_NAME")"
-image_title="${title_prefix}${title_suffix-}"
-repo_source="https://${REGISTRY_PROVIDER_FQDN}/${REPO_NAMESPACE}/${REPO_NAME}"
-revision="$(git -C "${script_dir}/../.." rev-parse HEAD)"
-description_url="${repo_source}/blob/main/docker"
-description_image="Built from \`${BASE_IMAGE_NAME}:${BASE_IMAGE_VARIANT}\`."
-description_docs="For documentation and source, visit: ${description_url}"
-if [ "$multiarch" = "true" ]; then
-    description_prefix="This multiarch ${base_image_name_cap:-Debian}-based"
-else
-    description_prefix="This ${base_image_name_cap:-Debian}-based"
-fi
-image_description=$(
-    {
-        cat <<- EOF
+    base_image_name_cap="$(capitalize "$BASE_IMAGE_NAME")"
+    image_title="${title_prefix}${title_suffix-}"
+    repo_source="https://${REGISTRY_PROVIDER_FQDN}/${REPO_NAMESPACE}/${REPO_NAME}"
+    revision="$(git -C "${script_dir}/../.." rev-parse HEAD)"
+    description_url="${repo_source}/blob/main/docker"
+    description_image="Built from \`${BASE_IMAGE_NAME}:${BASE_IMAGE_VARIANT}\`."
+    description_docs="For documentation and source, visit: ${description_url}"
+    if [ "$multiarch" = "true" ]; then
+        description_prefix="This multiarch ${base_image_name_cap:-Debian}-based"
+    else
+        description_prefix="This ${base_image_name_cap:-Debian}-based"
+    fi
+    image_description=$(
+        {
+            cat <<- EOF
 ${description_prefix:-This}
 Docker image is part of the **${REPO_NAME}** collection of container images.
 ${description_image}
 ${description_arch}
 ${description_docs}
 EOF
-    } | xargs echo
-)
+        } | xargs echo
+    )
 
-if [ "${BUILDX_PUSH:-true}" != "true" ]; then
-    echo "(∫) Publishing Docker image to ${REGISTRY_PROVIDER} Container Registry..." >&2
-    com=(docker push)
-    com+=("$REGISTRY_URL")
-
-    set -- "${com[@]}"
-    . "${script_dir}/executer.sh" "$@"
-
-    if [ -n "${version_tag-}" ]; then
-        REGISTRY_URL="${REGISTRY_URL_PREFIX}/${version_tag}"
-
-        echo "(*) Tagging with version tag '${version_tag-}'..." >&2
-        tag_image "$version_tag" "$REGISTRY_URL"
-
-        com=(docker push)
-        com+=("$REGISTRY_URL")
-
-        set -- "${com[@]}"
-        . "${script_dir}/executer.sh" "$@"
-    elif [ -n "${unstable_tag-}" ]; then
-        REGISTRY_URL="${REGISTRY_URL_PREFIX}/${unstable_tag}"
-
-        echo "(*) Tagging with 'unstable'..." >&2
-        tag_image "$build_tag" "$REGISTRY_URL"
-
-        com=(docker push)
-        com+=("$REGISTRY_URL")
-
-        set -- "${com[@]}"
-        . "${script_dir}/executer.sh" "$@"
-    elif [ -n "${latest_tag-}" ]; then
-        REGISTRY_URL="${REGISTRY_URL_PREFIX}/${major_version_tag}"
-
-        echo "(*) Tagging with major version tag '${major_version_tag-}'..." >&2
-        tag_image "$major_version_tag" "$REGISTRY_URL"
-
+    if [ "${USE_BUILDX:-true}" != "true" ]; then
+        echo "(∫) Publishing Docker image to ${REGISTRY_PROVIDER} Container Registry..." >&2
         com=(docker push)
         com+=("$REGISTRY_URL")
 
         set -- "${com[@]}"
         . "${script_dir}/executer.sh" "$@"
 
-        REGISTRY_URL="${REGISTRY_URL_PREFIX}/${latest_tag}"
+        if [ -n "${version_tag-}" ]; then
+            REGISTRY_URL="${REGISTRY_URL_PREFIX}/${version_tag}"
 
-        echo "(*) Tagging with 'latest'..." >&2
-        tag_image "$latest_tag" "$REGISTRY_URL"
+            echo "(*) Tagging with version tag '${version_tag-}'..." >&2
+            tag_image "$version_tag" "$REGISTRY_URL"
 
-        com=(docker push)
-        com+=("$REGISTRY_URL")
+            com=(docker push)
+            com+=("$REGISTRY_URL")
 
-        set -- "${com[@]}"
-        . "${script_dir}/executer.sh" "$@"
+            set -- "${com[@]}"
+            . "${script_dir}/executer.sh" "$@"
+        elif [ -n "${unstable_tag-}" ]; then
+            REGISTRY_URL="${REGISTRY_URL_PREFIX}/${unstable_tag}"
+
+            echo "(*) Tagging with 'unstable'..." >&2
+            tag_image "$build_tag" "$REGISTRY_URL"
+
+            com=(docker push)
+            com+=("$REGISTRY_URL")
+
+            set -- "${com[@]}"
+            . "${script_dir}/executer.sh" "$@"
+        elif [ -n "${latest_tag-}" ]; then
+            REGISTRY_URL="${REGISTRY_URL_PREFIX}/${major_version_tag}"
+
+            echo "(*) Tagging with major version tag '${major_version_tag-}'..." >&2
+            tag_image "$major_version_tag" "$REGISTRY_URL"
+
+            com=(docker push)
+            com+=("$REGISTRY_URL")
+
+            set -- "${com[@]}"
+            . "${script_dir}/executer.sh" "$@"
+
+            REGISTRY_URL="${REGISTRY_URL_PREFIX}/${latest_tag}"
+
+            echo "(*) Tagging with 'latest'..." >&2
+            tag_image "$latest_tag" "$REGISTRY_URL"
+
+            com=(docker push)
+            com+=("$REGISTRY_URL")
+
+            set -- "${com[@]}"
+            . "${script_dir}/executer.sh" "$@"
+        fi
     fi
 fi
 
@@ -252,39 +256,41 @@ remove_danglers() {
 
 remove_danglers "$build_tag"
 
-echo "(∫) Adding annotations to ${REGISTRY_URL} ..." >&2
+if [ "${NO_PUSH:-false}" != "true" ]; then
+    echo "(∫) Adding annotations to ${REGISTRY_URL} ..." >&2
 
-# Add OCI annotations to the image manifest
-# https://docs.docker.com/reference/cli/docker/buildx/imagetools/
-# https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry#labelling-container-images
-# https://github.com/opencontainers/image-spec/blob/main/annotations.md#pre-defined-annotation-keys
-com=(docker buildx imagetools create)
-com+=("-t" "${REGISTRY_URL}")
-[ -z "${major_version_tag-}" ] || com+=("-t" "${REGISTRY_URL_PREFIX}/${major_version_tag}")
-[ -z "${version_tag-}" ] || com+=("-t" "${REGISTRY_URL_PREFIX}/${version_tag}")
-[ -z "${unstable_tag-}" ] || com+=("-t" "${REGISTRY_URL_PREFIX}/${unstable_tag}")
-[ -z "${latest_tag-}" ] || com+=("-t" "${REGISTRY_URL_PREFIX}/${latest_tag}")
-# https://specs.opencontainers.org/image-spec/annotations/
-com+=("--annotation" "${annotation_prefix}org.opencontainers.image.description=${image_description//\\\`/\`}")
-com+=("--annotation" "${annotation_prefix}org.opencontainers.image.title=${image_title%.}${title_arch# }")
-com+=("--annotation" "${annotation_prefix}org.opencontainers.image.source=${repo_source}")
-if [ "$(lowercase "$REGISTRY_PROVIDER")" = "github" ]; then
-    github_pkg_url="${repo_source}/pkgs/container/${repo_source##*/}"
-    github_pkg_doc="${repo_source}/blob/main/docker/README.md"
-    com+=("--annotation" "${annotation_prefix}org.opencontainers.image.url=${github_pkg_url}")
-    com+=("--annotation" "${annotation_prefix}org.opencontainers.image.documentation=${github_pkg_doc}")
+    # Add OCI annotations to the image manifest
+    # https://docs.docker.com/reference/cli/docker/buildx/imagetools/
+    # https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry#labelling-container-images
+    # https://github.com/opencontainers/image-spec/blob/main/annotations.md#pre-defined-annotation-keys
+    com=(docker buildx imagetools create)
+    com+=("-t" "${REGISTRY_URL}")
+    [ -z "${version_tag-}" ] || com+=("-t" "${REGISTRY_URL_PREFIX}/${version_tag}")
+    [ -z "${unstable_tag-}" ] || com+=("-t" "${REGISTRY_URL_PREFIX}/${unstable_tag}")
+    [ -z "${major_version_tag-}" ] || com+=("-t" "${REGISTRY_URL_PREFIX}/${major_version_tag}")
+    [ -z "${latest_tag-}" ] || com+=("-t" "${REGISTRY_URL_PREFIX}/${latest_tag}")
+    # https://specs.opencontainers.org/image-spec/annotations/
+    com+=("--annotation" "${annotation_prefix}org.opencontainers.image.description=${image_description//\\\`/\`}")
+    com+=("--annotation" "${annotation_prefix}org.opencontainers.image.title=${image_title%.}${title_arch# }")
+    com+=("--annotation" "${annotation_prefix}org.opencontainers.image.source=${repo_source}")
+    if [ "$(lowercase "$REGISTRY_PROVIDER")" = "github" ]; then
+        github_pkg_url="${repo_source}/pkgs/container/${repo_source##*/}"
+        github_pkg_doc="${repo_source}/blob/main/docker/README.md"
+        com+=("--annotation" "${annotation_prefix}org.opencontainers.image.url=${github_pkg_url}")
+        com+=("--annotation" "${annotation_prefix}org.opencontainers.image.documentation=${github_pkg_doc}")
+    fi
+    com+=("--annotation" "${annotation_prefix}org.opencontainers.image.version=${build_tag##*:}")
+    com+=("--annotation" "${annotation_prefix}org.opencontainers.image.revision=${revision}")
+    com+=("--annotation" "${annotation_prefix}org.opencontainers.image.created=$(build_date "$build_tag")")
+    com+=("--annotation" "${annotation_prefix}org.opencontainers.image.vendor=${REPO_NAMESPACE}")
+    com+=("--annotation" "${annotation_prefix}org.opencontainers.image.base.name=${BASE_IMAGE_NAME}")
+    com+=("--annotation" "${annotation_prefix}org.opencontainers.image.base.variant=${BASE_IMAGE_VARIANT}")
+    com+=("--annotation" "${annotation_prefix}org.opencontainers.image.licenses=MIT")
+    com+=("$REGISTRY_URL")
+
+    set -- "${com[@]}"
+    . "${script_dir}/executer.sh" "$@"
 fi
-com+=("--annotation" "${annotation_prefix}org.opencontainers.image.version=${build_tag##*:}")
-com+=("--annotation" "${annotation_prefix}org.opencontainers.image.revision=${revision}")
-com+=("--annotation" "${annotation_prefix}org.opencontainers.image.created=$(build_date "$build_tag")")
-com+=("--annotation" "${annotation_prefix}org.opencontainers.image.vendor=${REPO_NAMESPACE}")
-com+=("--annotation" "${annotation_prefix}org.opencontainers.image.base.name=${BASE_IMAGE_NAME}")
-com+=("--annotation" "${annotation_prefix}org.opencontainers.image.base.variant=${BASE_IMAGE_VARIANT}")
-com+=("--annotation" "${annotation_prefix}org.opencontainers.image.licenses=MIT")
-com+=("$REGISTRY_URL")
-
-set -- "${com[@]}"
-. "${script_dir}/executer.sh" "$@"
 
 # Pull the manifest to ensure local availability
 # echo "Pulling the published Docker image manifest to ensure local availability..."

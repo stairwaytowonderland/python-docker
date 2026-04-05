@@ -56,18 +56,6 @@ fi
 
 # ---------------------------------------
 
-tag_image() {
-    local source_image="$1"
-    local target_image="$2"
-    echo "(+) Preparing Docker image for ${REGISTRY_PROVIDER} Container Registry..." >&2
-    echo "(*) Tagging Docker image '${source_image}' as '${target_image}'..." >&2
-    (
-        set -x
-        docker tag "$source_image" "$target_image"
-    )
-    echo -e "\033[2m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\033[0m" >&2
-}
-
 DEFAULT_TARGET="${DEFAULT_TARGET:-base}"
 DEFAULT_BASE_IMAGE_NAME="${DEFAULT_BASE_IMAGE_NAME:-ubuntu}"
 BASE_IMAGE_NAME="${BASE_IMAGE_NAME:-$DEFAULT_BASE_IMAGE_NAME}"
@@ -127,6 +115,34 @@ if [ ! -f "$dockerfile_path" ]; then
     exit 1
 fi
 
+tag_image() {
+    local source_image="$1"
+    local target_image="$2"
+    echo "(*) Tagging Docker image '${source_image}' as '${target_image}'..." >&2
+    (
+        set -x
+        docker tag "$source_image" "$target_image"
+    )
+    echo -e "\033[2m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\033[0m" >&2
+}
+
+pull_and_tag() {
+    local registry_prefix="$1"
+    local build_tag="$2"
+    shift 2
+    local tags=("$@")
+    local image="${registry_prefix}/${build_tag}"
+    echo "(+) Pulling image to local daemon and creating local tags..." >&2
+    (
+        set -x
+        docker pull "${image}"
+    )
+    [ "${image}" = "${build_tag}" ] || tag_image "${image}" "${build_tag}"
+    for tag in "${tags[@]}"; do
+        [ -z "$tag" ] || [ "$tag" = "$build_tag" ] || tag_image "${image}" "${tag}"
+    done
+}
+
 echo "(*) Building Docker image for ${build_tag}..." >&2
 echo "(*) Dockerfile path: ${dockerfile_path}" >&2
 echo "(*) Docker context: ${BUILD_CONTEXT}" >&2
@@ -143,54 +159,60 @@ elif [ -z "${unstable_tag-}" ] && [ "$DOCKER_TARGET" = "$DEFAULT_TARGET" ] && [ 
     echo "'${unstable_tag}'" >&2
 elif [ -z "${latest_tag-}" ] && [ "$DOCKER_TARGET" = "$DEFAULT_TARGET" ] && [ "${LATEST:-false}" = "true" ]; then
     echo -n "(*) Also tagging with major version ... " >&2
-    major_version_tag="${IMAGE_NAME}:${TAG_PREFIX%%.*}"
+    # major_version_tag="${IMAGE_NAME}:${TAG_PREFIX%%.*}"
+    major_version_tag="${IMAGE_NAME}:3"
     echo "'${major_version_tag}'" >&2
     echo -n "(*) Also tagging with latest ... " >&2
     latest_tag="${IMAGE_NAME}:latest"
     echo "'${latest_tag}'" >&2
 fi
 
-if [ "${BUILDX_PUSH:-true}" != "true" ]; then
+com_arg=()
+com_arg+=("--build-arg" "IMAGE_NAME=${BASE_IMAGE_NAME}")
+com_arg+=("--build-arg" "VARIANT=${BASE_IMAGE_VARIANT}")
+if [ -n "$REMOTE_USER" ]; then
+    com_arg+=("--build-arg" "USERNAME=${REMOTE_USER}")
+fi
+com_arg+=("--build-arg" "TIMEZONE=$(zoneinfo)")
+# Automatically pass build arguments prefixed with DOCKER_BUILD_
+# Strip the prefix and pass the variable to docker build
+while IFS='=' read -r name value; do
+    if [[ $name == DOCKER_BUILD_*   ]]; then
+        arg_name="${name#DOCKER_BUILD_}"
+        com_arg+=("--build-arg" "${arg_name}=${value}")
+    fi
+done < <(env)
+for arg in "$@"; do
+    if [ "$arg" != "$BUILD_CONTEXT" ]; then
+        com_arg+=("$arg")
+    fi
+done
+
+common_com=("-f" "${dockerfile_path}")
+common_com+=("--label" "org.opencontainers.image.ref.name=${build_tag}")
+common_com+=("--target" "${DOCKER_TARGET}")
+common_com+=("--platform=$(dedupe "${PLATFORM:-$DEFAULT_PLATFORM}")")
+
+local_tag_com=("-t" "${build_tag}")
+[ -z "${version_tag-}" ]       || local_tag_com+=("-t" "${version_tag}")
+[ -z "${unstable_tag-}" ]      || local_tag_com+=("-t" "${unstable_tag}")
+[ -z "${major_version_tag-}" ] || local_tag_com+=("-t" "${major_version_tag}")
+[ -z "${latest_tag-}" ]        || local_tag_com+=("-t" "${latest_tag}")
+
+if [ "${USE_BUILDX:-true}" != "true" ]; then
     echo "(*) Building Docker image without pushing..." >&2
 
-    com=(docker build)
-    com+=("-f" "${dockerfile_path}")
-    com+=("--label" "org.opencontainers.image.ref.name=${build_tag}")
-    com+=("--target" "${DOCKER_TARGET}")
-    [ -z "${version_tag-}" ]       || com+=("-t" "${version_tag}")
-    [ -z "${unstable_tag-}" ]      || com+=("-t" "${unstable_tag}")
-    [ -z "${latest_tag-}" ]        || com+=("-t" "${latest_tag}")
-    [ -z "${major_version_tag-}" ] || com+=("-t" "${major_version_tag}")
-    com+=("-t" "${build_tag}")
-    com+=("--platform=$(dedupe "${PLATFORM:-$DEFAULT_PLATFORM}")")
-    # The `debian:bookworm-slim` image provides a minimal base for development containers
-    com_arg=()
-    com_arg+=("--build-arg" "IMAGE_NAME=${BASE_IMAGE_NAME}")
-    com_arg+=("--build-arg" "VARIANT=${BASE_IMAGE_VARIANT}")
-    if [ -n "$REMOTE_USER" ]; then
-        com_arg+=("--build-arg" "USERNAME=${REMOTE_USER}")
-    fi
-    com_arg+=("--build-arg" "TIMEZONE=$(zoneinfo)")
-    # Automatically pass build arguments prefixed with DOCKER_BUILD_
-    # Strip the prefix and pass the variable to docker build
-    while IFS='=' read -r name value; do
-        if [[ $name == DOCKER_BUILD_*   ]]; then
-            arg_name="${name#DOCKER_BUILD_}"
-            com_arg+=("--build-arg" "${arg_name}=${value}")
-        fi
-    done < <(env)
-    for arg in "$@"; do
-        if [ "$arg" != "$BUILD_CONTEXT" ]; then
-            com_arg+=("$arg")
-        fi
-    done
-    com+=("${com_arg[@]}")
-    com+=("$BUILD_CONTEXT")
+    build_com=(docker build)
+    build_com+=("${common_com[@]}")
+    build_com+=("${local_tag_com[@]}")
+    build_com+=("${com_arg[@]}")
+    build_com+=("$BUILD_CONTEXT")
 
-    set -- "${com[@]}"
+    set -- "${build_com[@]}"
     . "${script_dir}/executer.sh" "$@"
 else
     echo "(*) Building and pushing Docker image with provenance and sbom attestations..." >&2
+
     if ! . "${script_dir}/login.sh" "${REGISTRY_USER:-${REPO_NAMESPACE}}" "${REPO_NAME:-${IMAGE_NAME}}"; then
         echo "Error: Not logged in to ${REGISTRY_PROVIDER} Container Registry." >&2
         exit 1
@@ -199,39 +221,35 @@ else
         exit 1
     fi
     IMAGE_VERSION="${IMAGE_VERSION:-latest}"
-    # docker_tag="${build_tag}"
-    # if [ "$IMAGE_VERSION" != "latest" ]; then
-    #     docker_tag="${docker_tag}-${IMAGE_VERSION}"
-    # else
-    #     docker_tag="${build_tag}"
-    # fi
     REGISTRY_URL="${REGISTRY_URL_PREFIX}/${build_tag}"
-    push_com=(docker buildx build)
-    push_com+=("-f" "${dockerfile_path}")
-    push_com+=("--push")
-    push_com+=("--provenance=mode=max")
-    push_com+=("--sbom=true")
-    push_com+=("--cache-from" "type=registry,ref=${REGISTRY_URL}")
-    push_com+=("--cache-to" "type=inline")
-    push_com+=("--target" "${DOCKER_TARGET}")
-    push_com+=("-t" "${REGISTRY_URL}")
-    [ -z "${major_version_tag-}" ] || push_com+=("-t" "${REGISTRY_URL_PREFIX}/${major_version_tag}")
-    [ -z "${version_tag-}" ]       || push_com+=("-t" "${REGISTRY_URL_PREFIX}/${version_tag}")
-    [ -z "${unstable_tag-}" ]      || push_com+=("-t" "${REGISTRY_URL_PREFIX}/${unstable_tag}")
-    [ -z "${latest_tag-}" ]        || push_com+=("-t" "${REGISTRY_URL_PREFIX}/${latest_tag}")
-    push_com+=("--platform=$(dedupe "${PLATFORM:-$DEFAULT_PLATFORM}")")
-    push_com+=("${com_arg[@]}")
-    push_com+=("$BUILD_CONTEXT")
-    set -- "${push_com[@]}"
+
+    registry_tag_com=("-t" "${REGISTRY_URL_PREFIX}/${build_tag}")
+    [ -z "${version_tag-}" ]       || registry_tag_com+=("-t" "${REGISTRY_URL_PREFIX}/${version_tag}")
+    [ -z "${unstable_tag-}" ]      || registry_tag_com+=("-t" "${REGISTRY_URL_PREFIX}/${unstable_tag}")
+    [ -z "${major_version_tag-}" ] || registry_tag_com+=("-t" "${REGISTRY_URL_PREFIX}/${major_version_tag}")
+    [ -z "${latest_tag-}" ]        || registry_tag_com+=("-t" "${REGISTRY_URL_PREFIX}/${latest_tag}")
+
+    buildx_com=(docker buildx build)
+    buildx_com+=("${common_com[@]}")
+    buildx_com+=("--provenance=mode=max")
+    buildx_com+=("--sbom=true")
+    if [ "${NO_PUSH:-false}" != "true" ]; then
+        buildx_com+=("--cache-from" "type=registry,ref=${REGISTRY_URL}-build-cache")
+        buildx_com+=("--cache-to" "type=registry,ref=${REGISTRY_URL}-build-cache,mode=max")
+        buildx_com+=("--push")
+        buildx_com+=("${registry_tag_com[@]}")
+    else
+        buildx_com+=("--load")
+        buildx_com+=("${local_tag_com[@]}")
+    fi
+    buildx_com+=("${com_arg[@]}")
+    buildx_com+=("$BUILD_CONTEXT")
+
+    set -- "${buildx_com[@]}"
     . "${script_dir}/executer.sh" "$@"
 
-    echo "(*) Pulling image to local daemon and creating local tags..." >&2
-    docker pull "${REGISTRY_URL}"
-    tag_image "${REGISTRY_URL}" "${build_tag}"
-    [ -z "${version_tag-}" ]       || tag_image "${REGISTRY_URL}" "${version_tag}"
-    [ -z "${major_version_tag-}" ] || tag_image "${REGISTRY_URL}" "${major_version_tag}"
-    [ -z "${unstable_tag-}" ]      || tag_image "${REGISTRY_URL}" "${unstable_tag}"
-    [ -z "${latest_tag-}" ]        || tag_image "${REGISTRY_URL}" "${latest_tag}"
+    # Comment out when running in a CI pipeline
+    [ "${NO_PUSH:-false}" = "true" ] || pull_and_tag "${REGISTRY_URL_PREFIX}" "${build_tag}" "${version_tag-}" "${unstable_tag-}" "${latest_tag-}" "${major_version_tag-}"
 fi
 
 echo "(√) Done! Docker image build complete." >&2

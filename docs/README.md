@@ -20,7 +20,7 @@ Tags follow the format `<python-version>[-<variant(ext|perf)>][-<base-image-ref>
 
 | Ubuntu<br>(*`ubuntu:latest`*)                                                                                                                                                                                                       | Debian<br>(*`debian:bookworm-slim`*)                                                                            | Python Version        | Notes                                                             |
 | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | --------------------- | ----------------------------------------------------------------- |
-| [`unstable-ubuntu`](https://hub.docker.com/layers/stairwaytowonderland/cpython/unstable-ubuntu), [`unstable`](https://hub.docker.com/layers/stairwaytowonderland/cpython/unstable)                                                  | [`unstable-bookworm-slim`](https://hub.docker.com/layers/stairwaytowonderland/cpython/unstable-bookworm-slim)   | *latest **unstable*** | Uses the latest **unstable** version of Python.                   |
+| [`unstable-ubuntu`](https://hub.docker.com/layers/stairwaytowonderland/cpython/unstable-ubuntu), [`unstable`](https://hub.docker.com/layers/stairwaytowonderland/cpython/unstable)                                                  | [`unstable-bookworm-slim`](https://hub.docker.com/layers/stairwaytowonderland/cpython/unstable-bookworm-slim)   | *latest **unstable*** | Uses the latest **unstable** version of Python                    |
 | [`3`](https://hub.docker.com/layers/stairwaytowonderland/cpython/3), [`ubuntu`](https://hub.docker.com/layers/stairwaytowonderland/cpython/ubuntu), [`latest`](https://hub.docker.com/layers/stairwaytowonderland/cpython/latest) 🚀 | [`bookworm-slim`](https://hub.docker.com/layers/stairwaytowonderland/cpython/bookworm-slim)                     | *latest **stable***   | ⭐ **Default** build; uses the latest **stable** version of Python |
 | [`3.14-ubuntu`](https://hub.docker.com/layers/stairwaytowonderland/cpython/3.14-ubuntu), [`3.14`](https://hub.docker.com/layers/stairwaytowonderland/cpython/3.14)                                                                  | [`3.14-bookworm-slim`](https://hub.docker.com/layers/stairwaytowonderland/cpython/3.14-bookworm-slim)           | 3.14                  | Standard build                                                    |
 | [`3.14-perf-ubuntu`](https://hub.docker.com/layers/stairwaytowonderland/cpython/3.14-perf-ubuntu)                                                                                                                                   | [`3.14-perf-bookworm-slim`](https://hub.docker.com/layers/stairwaytowonderland/cpython/3.14-perf-bookworm-slim) | 3.14                  | PGO-optimized (`ENABLE_OPTIMIZATIONS=true`)                       |
@@ -137,7 +137,7 @@ docker run --rm \
   python3 your-daemon-or-script.py
 ```
 
-# Standard Image Variants
+# Image Variants - Standard
 
 ## `cpython:<version>-ubuntu`
 
@@ -164,7 +164,7 @@ A development-oriented build with extended tooling included (`PYTHON_DEV=true`).
 environments and dev containers where additional build tools and libraries may be needed. Available for both `ubuntu` and
 `bookworm-slim` base variants.
 
-# Hardened Image Variants (DHI)
+# Image Variants - Hardened (DHI)
 
 ## `cpython:<version>-bookworm-debian12-dev`
 
@@ -179,7 +179,7 @@ A self-maintained Python  Docker image that builds [CPython](https://github.com/
 Debian-based (Debian or Ubuntu) base image. Designed for use as a lightweight, customizable Python runtime in
 container-based workflows.
 
-*Inspired by a personal need (want) for a production-grade, Ubuntu-based Python "**base**" image.*
+*Inspired by a personal desire for a production-grade, Ubuntu-based Python "**base**" image.*
 
 > 🌐 [github.com/stairwaytowonderland/cpython](https://github.com/stairwaytowonderland/cpython)
 
