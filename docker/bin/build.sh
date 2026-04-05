@@ -123,7 +123,7 @@ tag_image() {
         set -x
         docker tag "$source_image" "$target_image"
     )
-    echo -e "\033[2m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\033[0m" >&2
+    echo -e "\033[2m ~~~•~~~~•~~~~•~~~~•~~~~•~~~~•~~~~•~~~ \033[0m" >&2
 }
 
 pull_and_tag() {
@@ -239,6 +239,8 @@ else
         buildx_com+=("--push")
         buildx_com+=("${registry_tag_com[@]}")
     else
+        buildx_com+=("--cache-from" "type=local,src=/tmp/buildx-cache")
+        buildx_com+=("--cache-to" "type=local,dest=/tmp/buildx-cache-new,mode=max")
         buildx_com+=("--load")
         buildx_com+=("${local_tag_com[@]}")
     fi
@@ -248,10 +250,17 @@ else
     set -- "${buildx_com[@]}"
     . "${script_dir}/executer.sh" "$@"
 
+    # Rotate local BuildKit cache after a NO_PUSH build
+    if [ "${NO_PUSH:-false}" = "true" ]; then
+        rm -rf /tmp/buildx-cache
+        [ ! -d /tmp/buildx-cache-new ] || mv /tmp/buildx-cache-new /tmp/buildx-cache
+    fi
+
     # Comment out when running in a CI pipeline
     [ "${NO_PUSH:-false}" = "true" ] || pull_and_tag "${REGISTRY_URL_PREFIX}" "${build_tag}" "${version_tag-}" "${unstable_tag-}" "${latest_tag-}" "${major_version_tag-}"
 fi
 
 echo "(√) Done! Docker image build complete." >&2
 # echo "_______________________________________" >&2
-echo >&2
+echo -e "\033[2m|========+=========+=========+=========|\033[0m" >&2
+# echo >&2

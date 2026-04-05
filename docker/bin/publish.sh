@@ -127,7 +127,7 @@ build_date() {
         set -x
         docker inspect -f '{{.Created}}' "$(docker images --no-trunc -q -f reference="$1")"
     )
-    echo -e "\033[2m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\033[0m" >&2
+    echo -e "\033[2m ~~~•~~~~•~~~~•~~~~•~~~~•~~~~•~~~~•~~~ \033[0m" >&2
 }
 
 tag_image() {
@@ -139,7 +139,7 @@ tag_image() {
         set -x
         docker tag "$source_image" "$target_image"
     )
-    echo -e "\033[2m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\033[0m" >&2
+    echo -e "\033[2m ~~~•~~~~•~~~~•~~~~•~~~~•~~~~•~~~~•~~~ \033[0m" >&2
 }
 
 if [ "${NO_PUSH:-false}" != "true" ]; then
@@ -251,7 +251,7 @@ remove_danglers() {
             --filter dangling=true -q \
             | xargs -r docker rmi
     )
-    echo -e "\033[2m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\033[0m" >&2
+    echo -e "\033[2m ~~~•~~~~•~~~~•~~~~•~~~~•~~~~•~~~~•~~~ \033[0m" >&2
 }
 
 remove_danglers "$build_tag"
@@ -301,5 +301,6 @@ fi
 # . "${script_dir}/executer.sh" "$@"
 
 echo "(√) Done! Docker image publishing complete." >&2
-# echo "_______________________________________" >&2
-echo >&2
+# echo "________________________________________" >&2
+echo -e "\033[2m|========+=========+=========+=========|\033[0m" >&2
+# echo >&2

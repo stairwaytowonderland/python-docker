@@ -161,7 +161,7 @@ zoneinfo() {
     tz="${TIMEZONE:-$default_tz}"
     echo "$tz"
     echo "(∞) Timezone determined: ${tz}" >&2
-    echo -e "\033[2m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\033[0m" >&2
+    echo -e "\033[2m ~~~•~~~~•~~~~•~~~~•~~~~•~~~~•~~~~•~~~ \033[0m" >&2
 }
 
 # Main function to load environment variables from a .env file

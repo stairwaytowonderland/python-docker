@@ -29,5 +29,5 @@ if [ "${LOGGED_IN:-false}" != "true" ]; then
         && export LOGGED_IN=true
     echo "You can now publish images to ${REGISTRY_URL_PREFIX}/${REGISTRY_IMAGE}" >&2
     echo "Re-run this script with LOGGED_IN=true to skip logging in again." >&2
-    echo -e "\033[2m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\033[0m" >&2
+    echo -e "\033[2m ~~~•~~~~•~~~~•~~~~•~~~~•~~~~•~~~~•~~~ \033[0m" >&2
 fi

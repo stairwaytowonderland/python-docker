@@ -54,4 +54,4 @@ else
     printf "\n%s\033[7m ⏱ %s: %02d hours, %02d minutes, %02d seconds \033[0m\n" "${TIME_MSG_LABEL}" "${TIME_MSG_PREFIX% }" $((duration / 3600)) $((duration % 3600 / 60)) $((duration % 60)) >&2
 fi
 
-echo -e "\033[2m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\033[0m" >&2
+echo -e "\033[2m ~~~•~~~~•~~~~•~~~~•~~~~•~~~~•~~~~•~~~ \033[0m" >&2
