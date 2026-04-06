@@ -53,6 +53,7 @@ else
 fi
 
 . "${script_dir}/loader.sh" "${script_dir}/.."
+. "${script_dir}/helper.sh"
 
 # ---------------------------------------
 
@@ -68,6 +69,9 @@ REGISTRY_HOST="${REGISTRY_HOST:-registry-1.docker.io}"
 REGISTRY_PROVIDER="${REGISTRY_PROVIDER:-Docker Hub}"
 REPO_NAMESPACE="${REPO_NAMESPACE-}"
 REPO_NAME="${REPO_NAME-}"
+# Normalize BUILD and PUSH defaults
+BUILD="${BUILD:-true}"
+PUSH="${PUSH:-true}"
 
 # Determine Docker context
 if [ -d "$last_arg" ]; then
@@ -114,34 +118,6 @@ if [ ! -f "$dockerfile_path" ]; then
     echo "(!) Dockerfile not found at expected path: ${dockerfile_path}" >&2
     exit 1
 fi
-
-tag_image() {
-    local source_image="$1"
-    local target_image="$2"
-    echo "(*) Tagging Docker image '${source_image}' as '${target_image}'..." >&2
-    (
-        set -x
-        docker tag "$source_image" "$target_image"
-    )
-    echo -e "\033[2m ~~~•~~~~•~~~~•~~~~•~~~~•~~~~•~~~~•~~~ \033[0m" >&2
-}
-
-pull_and_tag() {
-    local registry_prefix="$1"
-    local build_tag="$2"
-    shift 2
-    local tags=("$@")
-    local image="${registry_prefix}/${build_tag}"
-    echo "(+) Pulling image to local daemon and creating local tags..." >&2
-    (
-        set -x
-        docker pull "${image}"
-    )
-    [ "${image}" = "${build_tag}" ] || tag_image "${image}" "${build_tag}"
-    for tag in "${tags[@]}"; do
-        [ -z "$tag" ] || [ "$tag" = "$build_tag" ] || tag_image "${image}" "${tag}"
-    done
-}
 
 echo "(*) Building Docker image for ${build_tag}..." >&2
 echo "(*) Dockerfile path: ${dockerfile_path}" >&2
@@ -191,7 +167,6 @@ done
 common_com=("-f" "${dockerfile_path}")
 common_com+=("--label" "org.opencontainers.image.ref.name=${build_tag}")
 common_com+=("--target" "${DOCKER_TARGET}")
-common_com+=("--platform=$(dedupe "${PLATFORM:-$DEFAULT_PLATFORM}")")
 
 local_tag_com=("-t" "${build_tag}")
 [ -z "${version_tag-}" ]       || local_tag_com+=("-t" "${version_tag}")
@@ -200,16 +175,21 @@ local_tag_com=("-t" "${build_tag}")
 [ -z "${latest_tag-}" ]        || local_tag_com+=("-t" "${latest_tag}")
 
 if [ "${USE_BUILDX:-true}" != "true" ]; then
-    echo "(*) Building Docker image without pushing..." >&2
+    if [ "$BUILD" = "true" ]; then
+        echo "(*) Building Docker image without pushing..." >&2
 
-    build_com=(docker build)
-    build_com+=("${common_com[@]}")
-    build_com+=("${local_tag_com[@]}")
-    build_com+=("${com_arg[@]}")
-    build_com+=("$BUILD_CONTEXT")
+        build_com=(docker build)
+        build_com+=("${common_com[@]}")
+        build_com+=("--platform=$(dedupe "${PLATFORM:-$DEFAULT_PLATFORM}")")
+        build_com+=("${local_tag_com[@]}")
+        build_com+=("${com_arg[@]}")
+        build_com+=("$BUILD_CONTEXT")
 
-    set -- "${build_com[@]}"
-    . "${script_dir}/executer.sh" "$@"
+        set -- "${build_com[@]}"
+        . "${script_dir}/executer.sh" "$@"
+    else
+        echo "(*) BUILD=false: skipping docker build." >&2
+    fi
 else
     echo "(*) Building and pushing Docker image with provenance and sbom attestations..." >&2
 
@@ -229,35 +209,61 @@ else
     [ -z "${major_version_tag-}" ] || registry_tag_com+=("-t" "${REGISTRY_URL_PREFIX}/${major_version_tag}")
     [ -z "${latest_tag-}" ]        || registry_tag_com+=("-t" "${REGISTRY_URL_PREFIX}/${latest_tag}")
 
-    buildx_com=(docker buildx build)
-    buildx_com+=("${common_com[@]}")
-    buildx_com+=("--provenance=mode=max")
-    buildx_com+=("--sbom=true")
-    if [ "${NO_PUSH:-false}" != "true" ]; then
-        buildx_com+=("--cache-from" "type=registry,ref=${REGISTRY_URL}-build-cache")
-        buildx_com+=("--cache-to" "type=registry,ref=${REGISTRY_URL}-build-cache,mode=max")
-        buildx_com+=("--push")
-        buildx_com+=("${registry_tag_com[@]}")
+    # PUSH=false when BUILD=true, PUSH not set (enforced at top of file)
+    if [ "$BUILD" = "true" ]; then
+        buildx_com=(docker buildx build)
+        buildx_com+=("${common_com[@]}")
+        buildx_com+=("--provenance=mode=max")
+        buildx_com+=("--sbom=true")
+        if [ "$PUSH" = "true" ]; then
+            buildx_com+=("--platform=$(dedupe "${PLATFORM:-$DEFAULT_PLATFORM}")")
+            buildx_com+=("--cache-from" "type=registry,ref=${REGISTRY_URL}-build-cache")
+            buildx_com+=("--cache-to" "type=registry,ref=${REGISTRY_URL}-build-cache,mode=max")
+            buildx_com+=("--push")
+            buildx_com+=("${registry_tag_com[@]}")
+        else
+            # --load requires single-platform; use DEFAULT_PLATFORM (native arch) to
+            # avoid concurrent multi-platform workers racing on the local cache
+            buildx_com+=("--platform=${DEFAULT_PLATFORM}")
+            buildx_com+=("--cache-from" "type=local,src=/tmp/buildx-cache")
+            buildx_com+=("--cache-to" "type=local,dest=/tmp/buildx-cache-new,mode=max")
+            buildx_com+=("--load")
+            buildx_com+=("${local_tag_com[@]}")
+        fi
+        buildx_com+=("${com_arg[@]}")
+        buildx_com+=("$BUILD_CONTEXT")
+
+        set -- "${buildx_com[@]}"
+        . "${script_dir}/executer.sh" "$@"
+
+        # Rotate local BuildKit cache after a no-push build
+        if [ "$PUSH" != "true" ]; then
+            rm -rf /tmp/buildx-cache
+            [ ! -d /tmp/buildx-cache-new ] || mv /tmp/buildx-cache-new /tmp/buildx-cache
+        fi
+
+        # Comment out when running in a CI pipeline
+        if [ "$PUSH" = "true" ]; then
+            pull_and_tag "${REGISTRY_URL_PREFIX}" "${build_tag}" "${version_tag-}" "${unstable_tag-}" "${major_version_tag-}" "${latest_tag-}"
+        fi
+    elif [ "$PUSH" = "true" ]; then
+        echo "(*) BUILD=false: tagging and pushing existing local image (skipping build)..." >&2
+        push_tags=("${REGISTRY_URL}")
+        tag_image "${build_tag}" "${REGISTRY_URL}"
+        for tag in "${version_tag-}" "${unstable_tag-}" "${major_version_tag-}" "${latest_tag-}"; do
+            if [ -n "$tag" ]; then
+                tag_image "${build_tag}" "${REGISTRY_URL_PREFIX}/${tag}"
+                push_tags+=("${REGISTRY_URL_PREFIX}/${tag}")
+            fi
+        done
+        for push_tag in "${push_tags[@]}"; do
+            push_com=(docker push "$push_tag")
+            set -- "${push_com[@]}"
+            . "${script_dir}/executer.sh" "$@"
+        done
     else
-        buildx_com+=("--cache-from" "type=local,src=/tmp/buildx-cache")
-        buildx_com+=("--cache-to" "type=local,dest=/tmp/buildx-cache-new,mode=max")
-        buildx_com+=("--load")
-        buildx_com+=("${local_tag_com[@]}")
+        echo "(*) BUILD=false and PUSH=false: nothing to do." >&2
     fi
-    buildx_com+=("${com_arg[@]}")
-    buildx_com+=("$BUILD_CONTEXT")
-
-    set -- "${buildx_com[@]}"
-    . "${script_dir}/executer.sh" "$@"
-
-    # Rotate local BuildKit cache after a NO_PUSH build
-    if [ "${NO_PUSH:-false}" = "true" ]; then
-        rm -rf /tmp/buildx-cache
-        [ ! -d /tmp/buildx-cache-new ] || mv /tmp/buildx-cache-new /tmp/buildx-cache
-    fi
-
-    # Comment out when running in a CI pipeline
-    [ "${NO_PUSH:-false}" = "true" ] || pull_and_tag "${REGISTRY_URL_PREFIX}" "${build_tag}" "${version_tag-}" "${unstable_tag-}" "${latest_tag-}" "${major_version_tag-}"
 fi
 
 echo "(√) Done! Docker image build complete." >&2
