@@ -59,23 +59,23 @@ inputs:
   latest:
     description: Whether this entry should be tagged as latest (from matrix)
     required: false
-    default: ""
+    default: "false"
   unstable:
     description: Whether this is an unstable/nightly build (from matrix)
     required: false
-    default: ""
+    default: "false"
   enable_optimizations:
     description: Enable PGO optimizations (from matrix)
     required: false
-    default: ""
+    default: "false"
   python_dev:
     description: Enable Python dev build (from matrix)
     required: false
-    default: ""
+    default: "false"
   enable_bolt:
     description: Enable BOLT optimization (from matrix)
     required: false
-    default: ""
+    default: "false"
 
 outputs:
   tags:
@@ -192,14 +192,16 @@ runs:
         BUILD_ARGS+=$'\n'"TIMEZONE=${{ inputs.timezone }}"
         BUILD_ARGS+=$'\n'"PYTHON_VERSION=${{ inputs.python_version }}"
         BUILD_ARGS+=$'\n'"MAKEFLAGS=-j ${{ steps.setup.outputs.nproc }} ${{ inputs.docker_build_makeflags }}"
-        BUILD_ARGS+=$'\n'"ENABLE_PRE_RELEASE=${{ inputs.docker_build_enable_pre_release }}"
-        if [ -n "${{ inputs.enable_optimizations }}" ]; then
+        if [ "${{ inputs.docker_build_enable_pre_release }}" = "true" ]; then
+          BUILD_ARGS+=$'\n'"ENABLE_PRE_RELEASE=${{ inputs.docker_build_enable_pre_release }}"
+        fi
+        if [ "${{ inputs.enable_optimizations }}" = "true" ]; then
           BUILD_ARGS+=$'\n'"ENABLE_OPTIMIZATIONS=${{ inputs.enable_optimizations }}"
         fi
-        if [ -n "${{ inputs.python_dev }}" ]; then
+        if [ "${{ inputs.python_dev }}" = "true" ]; then
           BUILD_ARGS+=$'\n'"PYTHON_DEV=${{ inputs.python_dev }}"
         fi
-        if [ -n "${{ inputs.enable_bolt }}" ]; then
+        if [ "${{ inputs.enable_bolt }}" = "true" ]; then
           BUILD_ARGS+=$'\n'"ENABLE_BOLT=${{ inputs.enable_bolt }}"
         fi
 

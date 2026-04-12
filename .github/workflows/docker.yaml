@@ -20,15 +20,8 @@ concurrency:
 env:
   REPO_NAME: cpython
   REPO_NAMESPACE: stairwaytowonderland
-  REGISTRY_HOST: docker.io
-  REGISTRY_PROVIDER_FQDN: hub.docker.com
-  REMOTE_USER: appuser
-  PLATFORM: linux/arm64,linux/amd64
-  TIMEZONE: UTC
-  DEFAULT_BASE_IMAGE_NAME: ubuntu
   DEFAULT_TARGET: base
-  DOCKER_BUILD_MAKEFLAGS: '--no-print-directory' # note: -j is set dynamically based on CPU count
-  DOCKER_BUILD_ENABLE_PRE_RELEASE: 'true'
+  PLATFORM: linux/arm64,linux/amd64
 
 jobs:
   build:
@@ -126,20 +119,20 @@ jobs:
               python_dev: 'true',
               enable_bolt: 'false',
             }
-          - {
-              base_image_name: ubuntu,
-              base_image_variant: latest,
-              python_version: 'latest',
-              tag_prefix: 'unstable',
-              unstable: 'true',
-            }
-          - {
-              base_image_name: ubuntu,
-              base_image_variant: latest,
-              python_version: 'current',
-              tag_prefix: 'latest',
-              latest: 'true',
-            }
+          # - {
+          #     base_image_name: ubuntu,
+          #     base_image_variant: latest,
+          #     python_version: 'latest',
+          #     tag_prefix: 'unstable',
+          #     unstable: 'true',
+          #   }
+          # - {
+          #     base_image_name: ubuntu,
+          #     base_image_variant: latest,
+          #     python_version: 'current',
+          #     tag_prefix: 'latest',
+          #     latest: 'true',
+          #   }
 
           # ──── dhi:bookworm-debian12-dev ────
           # NOTE: DHI base image is pulled from dhi.io during the build.
@@ -171,7 +164,7 @@ jobs:
       - name: Log in to Docker Hub
         uses: docker/login-action@v4
         with:
-          registry: ${{ env.REGISTRY_HOST }}
+          # registry: ${{ env.REGISTRY_HOST }}
           username: ${{ env.REPO_NAMESPACE }}
           password: ${{ secrets.CR_PAT }}
 
@@ -181,18 +174,10 @@ jobs:
         with:
           repo_name: ${{ env.REPO_NAME }}
           repo_namespace: ${{ env.REPO_NAMESPACE }}
-          registry_provider_fqdn: ${{ env.REGISTRY_PROVIDER_FQDN }}
-          default_base_image_name: ${{ env.DEFAULT_BASE_IMAGE_NAME }}
-          default_target: ${{ env.DEFAULT_TARGET }}
-          remote_user: ${{ env.REMOTE_USER }}
-          timezone: ${{ env.TIMEZONE }}
-          docker_build_makeflags: ${{ env.DOCKER_BUILD_MAKEFLAGS }}
-          docker_build_enable_pre_release: ${{ env.DOCKER_BUILD_ENABLE_PRE_RELEASE }}
           base_image_name: ${{ matrix.base_image_name }}
           base_image_variant: ${{ matrix.base_image_variant }}
           tag_prefix: ${{ matrix.tag_prefix }}
           python_version: ${{ matrix.python_version }}
-          latest: ${{ matrix.latest }}
           unstable: ${{ matrix.unstable }}
           enable_optimizations: ${{ matrix.enable_optimizations }}
           python_dev: ${{ matrix.python_dev }}
@@ -221,4 +206,67 @@ jobs:
             index:org.opencontainers.image.vendor=${{ env.REPO_NAMESPACE }}
             index:org.opencontainers.image.base.name=${{ matrix.base_image_name }}
             index:org.opencontainers.image.base.variant=${{ matrix.base_image_variant }}
+            index:org.opencontainers.image.licenses=MIT
+
+  # Runs after all matrix builds complete to ensure 'latest' reflects a fully successful run
+  build-latest:
+    name: 'latest (ubuntu:latest)'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v4
+        with:
+          # registry: ${{ env.REGISTRY_HOST }}
+          username: ${{ env.REPO_NAMESPACE }}
+          password: ${{ secrets.CR_PAT }}
+
+      - name: Compute image tags and build args
+        id: meta
+        uses: ./.github/actions/docker-setup
+        with:
+          repo_name: ${{ env.REPO_NAME }}
+          repo_namespace: ${{ env.REPO_NAMESPACE }}
+          base_image_name: ubuntu
+          base_image_variant: latest
+          tag_prefix: latest
+          # python_version: current
+          python_version: latest
+          latest: 'true'
+
+      - name: Build and push
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./docker/Dockerfile
+          platforms: ${{ env.PLATFORM }}
+          push: true
+          target: ${{ env.DEFAULT_TARGET }}
+          tags: ${{ steps.meta.outputs.tags }}
+          build-args: ${{ steps.meta.outputs.build_args }}
+          provenance: mode=max
+          sbom: true
+          cache-from: type=registry,ref=${{ steps.meta.outputs.cache_ref }}
+          cache-to: type=registry,ref=${{ steps.meta.outputs.cache_ref }},mode=max
+          annotations: |
+            index:org.opencontainers.image.description=${{ steps.meta.outputs.image_desc }}
+            index:org.opencontainers.image.title=${{ steps.meta.outputs.image_title }}
+            index:org.opencontainers.image.source=${{ steps.meta.outputs.repo_source }}
+            index:org.opencontainers.image.version=${{ steps.meta.outputs.image_version }}
+            index:org.opencontainers.image.revision=${{ github.sha }}
+            index:org.opencontainers.image.vendor=${{ env.REPO_NAMESPACE }}
+            index:org.opencontainers.image.base.name=ubuntu
+            index:org.opencontainers.image.base.variant=latest
             index:org.opencontainers.image.licenses=MIT
