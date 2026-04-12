@@ -1,0 +1,303 @@
+name: Build and Publish Docker Images
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'docker/helpers/**'
+      - 'docker/lib-scripts/**'
+      - 'docker/utils/**'
+      - 'docker/Dockerfile'
+
+# ──────────────────────────────────────────────────────────
+# Non-sensitive values sourced from docker/.env
+# ──────────────────────────────────────────────────────────
+env:
+  REPO_NAME: cpython
+  REPO_NAMESPACE: stairwaytowonderland
+  REGISTRY_HOST: registry-1.docker.io
+  REGISTRY_PROVIDER_FQDN: hub.docker.com
+  REMOTE_USER: appuser
+  PLATFORM: linux/arm64,linux/amd64
+  TIMEZONE: UTC
+  DEFAULT_BASE_IMAGE_NAME: ubuntu
+  DEFAULT_TARGET: base
+  DOCKER_BUILD_MAKEFLAGS: '--no-print-directory' # note: -j is set dynamically based on CPU count
+  DOCKER_BUILD_ENABLE_PRE_RELEASE: 'true'
+
+jobs:
+  setup:
+    name: Setup
+    runs-on: ubuntu-latest
+    outputs:
+      nproc: ${{ steps.cpu.outputs.nproc }}
+    steps:
+      - name: Detect CPU count
+        id: cpu
+        run: echo "nproc=$(nproc)" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: '${{ matrix.tag_prefix }} (${{ matrix.base_image_name }}:${{ matrix.base_image_variant }})'
+    needs: setup
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # ──── debian:bookworm-slim ────
+          - { base_image_name: debian, base_image_variant: bookworm-slim, python_version: '3.10', tag_prefix: '3.10' }
+          - { base_image_name: debian, base_image_variant: bookworm-slim, python_version: '3.11', tag_prefix: '3.11' }
+          - { base_image_name: debian, base_image_variant: bookworm-slim, python_version: '3.12', tag_prefix: '3.12' }
+          - {
+              base_image_name: debian,
+              base_image_variant: bookworm-slim,
+              python_version: '3.12',
+              tag_prefix: '3.12-perf',
+              enable_optimizations: 'true',
+            }
+          - {
+              base_image_name: debian,
+              base_image_variant: bookworm-slim,
+              python_version: '3.12',
+              tag_prefix: '3.12-ext',
+              python_dev: 'true',
+              enable_bolt: 'false',
+            }
+          - { base_image_name: debian, base_image_variant: bookworm-slim, python_version: '3.13', tag_prefix: '3.13' }
+          - { base_image_name: debian, base_image_variant: bookworm-slim, python_version: '3.14', tag_prefix: '3.14' }
+          - {
+              base_image_name: debian,
+              base_image_variant: bookworm-slim,
+              python_version: '3.14',
+              tag_prefix: '3.14-perf',
+              enable_optimizations: 'true',
+            }
+          - {
+              base_image_name: debian,
+              base_image_variant: bookworm-slim,
+              python_version: '3.14',
+              tag_prefix: '3.14-ext',
+              python_dev: 'true',
+              enable_bolt: 'false',
+            }
+          - {
+              base_image_name: debian,
+              base_image_variant: bookworm-slim,
+              python_version: 'latest',
+              tag_prefix: 'unstable',
+              unstable: 'true',
+            }
+          - {
+              base_image_name: debian,
+              base_image_variant: bookworm-slim,
+              python_version: 'current',
+              tag_prefix: 'latest',
+            }
+
+          # ──── ubuntu:latest ────
+          - { base_image_name: ubuntu, base_image_variant: latest, python_version: '3.10', tag_prefix: '3.10' }
+          - { base_image_name: ubuntu, base_image_variant: latest, python_version: '3.11', tag_prefix: '3.11' }
+          - { base_image_name: ubuntu, base_image_variant: latest, python_version: '3.12', tag_prefix: '3.12' }
+          - {
+              base_image_name: ubuntu,
+              base_image_variant: latest,
+              python_version: '3.12',
+              tag_prefix: '3.12-perf',
+              enable_optimizations: 'true',
+            }
+          - {
+              base_image_name: ubuntu,
+              base_image_variant: latest,
+              python_version: '3.12',
+              tag_prefix: '3.12-ext',
+              python_dev: 'true',
+              enable_bolt: 'false',
+            }
+          - { base_image_name: ubuntu, base_image_variant: latest, python_version: '3.13', tag_prefix: '3.13' }
+          - { base_image_name: ubuntu, base_image_variant: latest, python_version: '3.14', tag_prefix: '3.14' }
+          - {
+              base_image_name: ubuntu,
+              base_image_variant: latest,
+              python_version: '3.14',
+              tag_prefix: '3.14-perf',
+              enable_optimizations: 'true',
+            }
+          - {
+              base_image_name: ubuntu,
+              base_image_variant: latest,
+              python_version: '3.14',
+              tag_prefix: '3.14-ext',
+              python_dev: 'true',
+              enable_bolt: 'false',
+            }
+          - {
+              base_image_name: ubuntu,
+              base_image_variant: latest,
+              python_version: 'latest',
+              tag_prefix: 'unstable',
+              unstable: 'true',
+            }
+          - {
+              base_image_name: ubuntu,
+              base_image_variant: latest,
+              python_version: 'current',
+              tag_prefix: 'latest',
+              latest: 'true',
+            }
+
+          # ──── dhi:bookworm-debian12-dev ────
+          # NOTE: DHI base image is pulled from dhi.io during the build.
+          #       If dhi.io requires authentication, add a docker/login-action
+          #       step for it using DHI_REGISTRY_PAT / DHI_REGISTRY_USER secrets.
+          - {
+              base_image_name: dhi,
+              base_image_variant: bookworm-debian12-dev,
+              python_version: '3.12',
+              tag_prefix: '3.12',
+            }
+          - {
+              base_image_name: dhi,
+              base_image_variant: bookworm-debian12-dev,
+              python_version: '3.14',
+              tag_prefix: '3.14',
+            }
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY_HOST }}
+          username: ${{ env.REPO_NAMESPACE }}
+          password: ${{ secrets.CR_PAT }}
+
+      - name: Compute image tags and build args
+        id: meta
+        run: |
+          set -euo pipefail
+
+          IMAGE="${{ env.REPO_NAMESPACE }}/${{ env.REPO_NAME }}"
+          BASE_IMAGE_NAME="${{ matrix.base_image_name }}"
+          BASE_IMAGE_VARIANT="${{ matrix.base_image_variant }}"
+          TAG_PREFIX="${{ matrix.tag_prefix }}"
+          LATEST="${{ matrix.latest }}"
+          UNSTABLE="${{ matrix.unstable }}"
+          DEFAULT_BASE="${{ env.DEFAULT_BASE_IMAGE_NAME }}"
+
+          # Determine BASE_IMAGE_REF (mirrors build.sh / publish.sh logic)
+          if [ "$BASE_IMAGE_VARIANT" = "latest" ]; then
+            BASE_IMAGE_REF="$BASE_IMAGE_NAME"
+          else
+            BASE_IMAGE_REF="$BASE_IMAGE_VARIANT"
+          fi
+
+          # Compute primary build tag
+          if [ "$TAG_PREFIX" = "latest" ]; then
+            BUILD_TAG="${IMAGE}:${BASE_IMAGE_REF}"
+          else
+            BUILD_TAG="${IMAGE}:${TAG_PREFIX}-${BASE_IMAGE_REF}"
+          fi
+
+          TAGS="$BUILD_TAG"
+
+          # Determine tag variant (text after first dash in TAG_PREFIX)
+          TAG_VARIANT="${TAG_PREFIX#*-}"
+          [ "$TAG_VARIANT" != "$TAG_PREFIX" ] || TAG_VARIANT=""
+
+          # Additional tags — mirrors the if/elif chain in build.sh and publish.sh
+          if [ "$BASE_IMAGE_NAME" = "$DEFAULT_BASE" ] && \
+             [ "$LATEST" != "true" ] && \
+             [ "$TAG_VARIANT" != "ext" ] && [ "$TAG_VARIANT" != "perf" ]; then
+            # Version tag (e.g. cpython:3.14)
+            TAGS+=$'\n'"${IMAGE}:${TAG_PREFIX}"
+            # Major-version tag (e.g. cpython:3) — set by publish.sh
+            MAJOR="${TAG_PREFIX%%.*}"
+            [ "$MAJOR" = "$TAG_PREFIX" ] || TAGS+=$'\n'"${IMAGE}:${MAJOR}"
+          elif [ "$UNSTABLE" = "true" ]; then
+            TAGS+=$'\n'"${IMAGE}:unstable"
+          elif [ "$LATEST" = "true" ]; then
+            TAGS+=$'\n'"${IMAGE}:latest"
+            TAGS+=$'\n'"${IMAGE}:3"
+          fi
+
+          # Deduplicate tags
+          TAGS="$(echo "$TAGS" | awk '!seen[$0]++')"
+
+          # Cache reference (matches build.sh registry cache key)
+          CACHE_REF="${BUILD_TAG}-build-cache"
+
+          # Annotation metadata
+          BASE_CAP="$(echo "$BASE_IMAGE_NAME" | awk '{print toupper(substr($0,1,1)) tolower(substr($0,2))}')"
+          IMAGE_TITLE="${{ env.REPO_NAME }} - ${{ env.DEFAULT_TARGET }} - ${BASE_IMAGE_NAME} - ${BASE_IMAGE_VARIANT}"
+          REPO_SOURCE="https://${{ env.REGISTRY_PROVIDER_FQDN }}/${{ env.REPO_NAMESPACE }}/${{ env.REPO_NAME }}"
+          IMAGE_DESC="This ${BASE_CAP}-based Docker image is part of the ${{ env.REPO_NAME }} collection of container images. Built from ${BASE_IMAGE_NAME}:${BASE_IMAGE_VARIANT}. For documentation and source, visit: ${REPO_SOURCE}/blob/main/docker"
+          IMAGE_VERSION="${BUILD_TAG##*:}"
+
+          # Build args
+          BUILD_ARGS="IMAGE_NAME=${BASE_IMAGE_NAME}"
+          BUILD_ARGS+=$'\n'"VARIANT=${BASE_IMAGE_VARIANT}"
+          BUILD_ARGS+=$'\n'"USERNAME=${{ env.REMOTE_USER }}"
+          BUILD_ARGS+=$'\n'"TIMEZONE=${{ env.TIMEZONE }}"
+          BUILD_ARGS+=$'\n'"PYTHON_VERSION=${{ matrix.python_version }}"
+          BUILD_ARGS+=$'\n'"MAKEFLAGS=-j ${{ needs.setup.outputs.nproc }} ${{ env.DOCKER_BUILD_MAKEFLAGS }}"
+          BUILD_ARGS+=$'\n'"ENABLE_PRE_RELEASE=${{ env.DOCKER_BUILD_ENABLE_PRE_RELEASE }}"
+          if [ -n "${{ matrix.enable_optimizations }}" ]; then
+            BUILD_ARGS+=$'\n'"ENABLE_OPTIMIZATIONS=${{ matrix.enable_optimizations }}"
+          fi
+          if [ -n "${{ matrix.python_dev }}" ]; then
+            BUILD_ARGS+=$'\n'"PYTHON_DEV=${{ matrix.python_dev }}"
+          fi
+          if [ -n "${{ matrix.enable_bolt }}" ]; then
+            BUILD_ARGS+=$'\n'"ENABLE_BOLT=${{ matrix.enable_bolt }}"
+          fi
+
+          # Write outputs
+          {
+            echo "tags<<EOF"
+            echo "$TAGS"
+            echo "EOF"
+            echo "build_args<<EOF"
+            echo "$BUILD_ARGS"
+            echo "EOF"
+            echo "cache_ref=${CACHE_REF}"
+            echo "image_title=${IMAGE_TITLE}"
+            echo "image_desc=${IMAGE_DESC}"
+            echo "image_version=${IMAGE_VERSION}"
+            echo "repo_source=${REPO_SOURCE}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./docker/Dockerfile
+          platforms: ${{ env.PLATFORM }}
+          push: true
+          target: ${{ env.DEFAULT_TARGET }}
+          tags: ${{ steps.meta.outputs.tags }}
+          build-args: ${{ steps.meta.outputs.build_args }}
+          provenance: mode=max
+          sbom: true
+          cache-from: type=registry,ref=${{ steps.meta.outputs.cache_ref }}
+          cache-to: type=registry,ref=${{ steps.meta.outputs.cache_ref }},mode=max
+          annotations: |
+            index:org.opencontainers.image.description=${{ steps.meta.outputs.image_desc }}
+            index:org.opencontainers.image.title=${{ steps.meta.outputs.image_title }}
+            index:org.opencontainers.image.source=${{ steps.meta.outputs.repo_source }}
+            index:org.opencontainers.image.version=${{ steps.meta.outputs.image_version }}
+            index:org.opencontainers.image.revision=${{ github.sha }}
+            index:org.opencontainers.image.vendor=${{ env.REPO_NAMESPACE }}
+            index:org.opencontainers.image.base.name=${{ matrix.base_image_name }}
+            index:org.opencontainers.image.base.variant=${{ matrix.base_image_variant }}
+            index:org.opencontainers.image.licenses=MIT
