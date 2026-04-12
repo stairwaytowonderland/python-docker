@@ -10,6 +10,10 @@ on:
     #   - 'docker/utils/**'
     #   - 'docker/Dockerfile'
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 # ──────────────────────────────────────────────────────────
 # Non-sensitive values sourced from docker/.env
 # ──────────────────────────────────────────────────────────
