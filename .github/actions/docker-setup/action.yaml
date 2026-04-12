@@ -1,0 +1,219 @@
+name: Compute Docker Image Metadata
+description: Compute image tags, build args, cache refs, and OCI annotation metadata.
+
+inputs:
+  repo_name:
+    description: Repository/image name (e.g. cpython)
+    required: true
+  repo_namespace:
+    description: Registry namespace/org (e.g. stairwaytowonderland)
+    required: true
+  registry_provider_fqdn:
+    description: Registry provider FQDN for annotation URLs (e.g. hub.docker.com)
+    required: false
+    default: hub.docker.com
+  default_base_image_name:
+    description: Default base image name used to determine extra tagging (e.g. ubuntu)
+    required: false
+    default: ubuntu
+  default_target:
+    description: Default Dockerfile target stage (e.g. base)
+    required: false
+    default: base
+  remote_user:
+    description: Non-root user created in the image (e.g. appuser)
+    required: false
+    default: appuser
+  timezone:
+    description: Timezone for the build (e.g. UTC)
+    required: false
+    default: UTC
+  nproc:
+    description: Override for CPU core count used in MAKEFLAGS -j (0 = auto-detect via nproc)
+    required: false
+    default: "0"
+  docker_build_makeflags:
+    description: Additional MAKEFLAGS options (e.g. --no-print-directory)
+    required: false
+    default: "--no-print-directory"
+  docker_build_enable_pre_release:
+    description: Enable pre-release Python builds
+    required: false
+    default: "true"
+  base_image_name:
+    description: Base image name for this build (from matrix; defaults to default_base_image_name)
+    required: false
+    default: ""
+  base_image_variant:
+    description: Base image variant/tag (from matrix; defaults to 'latest')
+    required: false
+    default: ""
+  tag_prefix:
+    description: Tag prefix for this build (from matrix)
+    required: false
+    default: latest
+  python_version:
+    description: Python version to build (from matrix)
+    required: false
+    default: latest
+  latest:
+    description: Whether this entry should be tagged as latest (from matrix)
+    required: false
+    default: ""
+  unstable:
+    description: Whether this is an unstable/nightly build (from matrix)
+    required: false
+    default: ""
+  enable_optimizations:
+    description: Enable PGO optimizations (from matrix)
+    required: false
+    default: ""
+  python_dev:
+    description: Enable Python dev build (from matrix)
+    required: false
+    default: ""
+  enable_bolt:
+    description: Enable BOLT optimization (from matrix)
+    required: false
+    default: ""
+
+outputs:
+  tags:
+    description: Newline-separated list of image tags
+    value: ${{ steps.meta.outputs.tags }}
+  build_args:
+    description: Newline-separated list of Docker build args
+    value: ${{ steps.meta.outputs.build_args }}
+  cache_ref:
+    description: Registry cache reference for this build
+    value: ${{ steps.meta.outputs.cache_ref }}
+  image_title:
+    description: OCI annotation image title
+    value: ${{ steps.meta.outputs.image_title }}
+  image_desc:
+    description: OCI annotation image description
+    value: ${{ steps.meta.outputs.image_desc }}
+  image_version:
+    description: OCI annotation image version
+    value: ${{ steps.meta.outputs.image_version }}
+  repo_source:
+    description: OCI annotation repository source URL
+    value: ${{ steps.meta.outputs.repo_source }}
+
+runs:
+  using: composite
+  steps:
+    - name: Setup
+      id: setup
+      shell: bash
+      run: |
+        NPROC="${{ inputs.nproc }}"
+        [ "$NPROC" -gt "0" ] || NPROC="$(nproc)"
+        echo "Detected $NPROC CPU cores."
+
+        BASE_IMAGE_NAME="${{ inputs.base_image_name }}"
+        [ -n "$BASE_IMAGE_NAME" ] || BASE_IMAGE_NAME="${{ inputs.default_base_image_name }}"
+        BASE_IMAGE_VARIANT="${{ inputs.base_image_variant }}"
+        [ -n "$BASE_IMAGE_VARIANT" ] || BASE_IMAGE_VARIANT="latest"
+
+        {
+          echo "nproc=$NPROC"
+          echo "base_image_name=$BASE_IMAGE_NAME"
+          echo "base_image_variant=$BASE_IMAGE_VARIANT"
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Compute image tags and build args
+      id: meta
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        IMAGE="${{ inputs.repo_namespace }}/${{ inputs.repo_name }}"
+        BASE_IMAGE_NAME="${{ steps.setup.outputs.base_image_name }}"
+        BASE_IMAGE_VARIANT="${{ steps.setup.outputs.base_image_variant }}"
+        TAG_PREFIX="${{ inputs.tag_prefix }}"
+        LATEST="${{ inputs.latest }}"
+        UNSTABLE="${{ inputs.unstable }}"
+        DEFAULT_BASE="${{ inputs.default_base_image_name }}"
+
+        # Determine BASE_IMAGE_REF (mirrors build.sh / publish.sh logic)
+        if [ "$BASE_IMAGE_VARIANT" = "latest" ]; then
+          BASE_IMAGE_REF="$BASE_IMAGE_NAME"
+        else
+          BASE_IMAGE_REF="$BASE_IMAGE_VARIANT"
+        fi
+
+        # Compute primary build tag
+        if [ "$TAG_PREFIX" = "latest" ]; then
+          BUILD_TAG="${IMAGE}:${BASE_IMAGE_REF}"
+        else
+          BUILD_TAG="${IMAGE}:${TAG_PREFIX}-${BASE_IMAGE_REF}"
+        fi
+
+        TAGS="$BUILD_TAG"
+
+        # Determine tag variant (text after first dash in TAG_PREFIX)
+        TAG_VARIANT="${TAG_PREFIX#*-}"
+        [ "$TAG_VARIANT" != "$TAG_PREFIX" ] || TAG_VARIANT=""
+
+        # Additional tags — mirrors the if/elif chain in build.sh and publish.sh
+        if [ "$BASE_IMAGE_NAME" = "$DEFAULT_BASE" ] && \
+           [ "$LATEST" != "true" ] && \
+           [ "$TAG_VARIANT" != "ext" ] && [ "$TAG_VARIANT" != "perf" ]; then
+          # Version tag (e.g. cpython:3.14)
+          TAGS+=$'\n'"${IMAGE}:${TAG_PREFIX}"
+          # Major-version tag (e.g. cpython:3) — set by publish.sh
+          MAJOR="${TAG_PREFIX%%.*}"
+          [ "$MAJOR" = "$TAG_PREFIX" ] || TAGS+=$'\n'"${IMAGE}:${MAJOR}"
+        elif [ "$UNSTABLE" = "true" ]; then
+          TAGS+=$'\n'"${IMAGE}:unstable"
+        elif [ "$LATEST" = "true" ]; then
+          TAGS+=$'\n'"${IMAGE}:latest"
+          TAGS+=$'\n'"${IMAGE}:3"
+        fi
+
+        # Deduplicate tags
+        TAGS="$(echo "$TAGS" | awk '!seen[$0]++')"
+
+        # Cache reference (matches build.sh registry cache key)
+        CACHE_REF="${BUILD_TAG}-build-cache"
+
+        # Annotation metadata
+        BASE_CAP="$(echo "$BASE_IMAGE_NAME" | awk '{print toupper(substr($0,1,1)) tolower(substr($0,2))}')"
+        IMAGE_TITLE="${{ inputs.repo_name }} - ${{ inputs.default_target }} - ${BASE_IMAGE_NAME} - ${BASE_IMAGE_VARIANT}"
+        REPO_SOURCE="https://${{ inputs.registry_provider_fqdn }}/${{ inputs.repo_namespace }}/${{ inputs.repo_name }}"
+        IMAGE_DESC="This ${BASE_CAP}-based Docker image is part of the ${{ inputs.repo_name }} collection of container images. Built from ${BASE_IMAGE_NAME}:${BASE_IMAGE_VARIANT}. For documentation and source, visit: ${REPO_SOURCE}/blob/main/docker"
+        IMAGE_VERSION="${BUILD_TAG##*:}"
+
+        # Build args
+        BUILD_ARGS="IMAGE_NAME=${BASE_IMAGE_NAME}"
+        BUILD_ARGS+=$'\n'"VARIANT=${BASE_IMAGE_VARIANT}"
+        BUILD_ARGS+=$'\n'"USERNAME=${{ inputs.remote_user }}"
+        BUILD_ARGS+=$'\n'"TIMEZONE=${{ inputs.timezone }}"
+        BUILD_ARGS+=$'\n'"PYTHON_VERSION=${{ inputs.python_version }}"
+        BUILD_ARGS+=$'\n'"MAKEFLAGS=-j ${{ steps.setup.outputs.nproc }} ${{ inputs.docker_build_makeflags }}"
+        BUILD_ARGS+=$'\n'"ENABLE_PRE_RELEASE=${{ inputs.docker_build_enable_pre_release }}"
+        if [ -n "${{ inputs.enable_optimizations }}" ]; then
+          BUILD_ARGS+=$'\n'"ENABLE_OPTIMIZATIONS=${{ inputs.enable_optimizations }}"
+        fi
+        if [ -n "${{ inputs.python_dev }}" ]; then
+          BUILD_ARGS+=$'\n'"PYTHON_DEV=${{ inputs.python_dev }}"
+        fi
+        if [ -n "${{ inputs.enable_bolt }}" ]; then
+          BUILD_ARGS+=$'\n'"ENABLE_BOLT=${{ inputs.enable_bolt }}"
+        fi
+
+        # Write outputs
+        {
+          echo "tags<<EOF"
+          echo "$TAGS"
+          echo "EOF"
+          echo "build_args<<EOF"
+          echo "$BUILD_ARGS"
+          echo "EOF"
+          echo "cache_ref=${CACHE_REF}"
+          echo "image_title=${IMAGE_TITLE}"
+          echo "image_desc=${IMAGE_DESC}"
+          echo "image_version=${IMAGE_VERSION}"
+          echo "repo_source=${REPO_SOURCE}"
+        } >> "$GITHUB_OUTPUT"

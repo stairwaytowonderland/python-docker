@@ -20,7 +20,7 @@ concurrency:
 env:
   REPO_NAME: cpython
   REPO_NAMESPACE: stairwaytowonderland
-  REGISTRY_HOST: registry-1.docker.io
+  REGISTRY_HOST: docker.io
   REGISTRY_PROVIDER_FQDN: hub.docker.com
   REMOTE_USER: appuser
   PLATFORM: linux/arm64,linux/amd64
@@ -31,28 +31,8 @@ env:
   DOCKER_BUILD_ENABLE_PRE_RELEASE: 'true'
 
 jobs:
-  preflight:
-    name: Pre-flight Checks & Setup
-    runs-on: ubuntu-latest
-    outputs:
-      nproc: ${{ steps.cpu.outputs.nproc }}
-    steps:
-      - name: Detect CPU count
-        id: cpu
-        run: |
-          nproc="$(nproc)"
-          echo "Detected $nproc CPU cores."
-          echo "nproc=$nproc" >> "$GITHUB_OUTPUT"
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v4
-        with:
-          registry: ${{ env.REGISTRY_HOST }}
-          username: ${{ env.REPO_NAMESPACE }}
-          password: ${{ secrets.CR_PAT }}
-
   build:
     name: '${{ matrix.tag_prefix }} (${{ matrix.base_image_name }}:${{ matrix.base_image_variant }})'
-    needs: preflight
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -197,98 +177,26 @@ jobs:
 
       - name: Compute image tags and build args
         id: meta
-        run: |
-          set -euo pipefail
-
-          IMAGE="${{ env.REPO_NAMESPACE }}/${{ env.REPO_NAME }}"
-          BASE_IMAGE_NAME="${{ matrix.base_image_name }}"
-          BASE_IMAGE_VARIANT="${{ matrix.base_image_variant }}"
-          TAG_PREFIX="${{ matrix.tag_prefix }}"
-          LATEST="${{ matrix.latest }}"
-          UNSTABLE="${{ matrix.unstable }}"
-          DEFAULT_BASE="${{ env.DEFAULT_BASE_IMAGE_NAME }}"
-
-          # Determine BASE_IMAGE_REF (mirrors build.sh / publish.sh logic)
-          if [ "$BASE_IMAGE_VARIANT" = "latest" ]; then
-            BASE_IMAGE_REF="$BASE_IMAGE_NAME"
-          else
-            BASE_IMAGE_REF="$BASE_IMAGE_VARIANT"
-          fi
-
-          # Compute primary build tag
-          if [ "$TAG_PREFIX" = "latest" ]; then
-            BUILD_TAG="${IMAGE}:${BASE_IMAGE_REF}"
-          else
-            BUILD_TAG="${IMAGE}:${TAG_PREFIX}-${BASE_IMAGE_REF}"
-          fi
-
-          TAGS="$BUILD_TAG"
-
-          # Determine tag variant (text after first dash in TAG_PREFIX)
-          TAG_VARIANT="${TAG_PREFIX#*-}"
-          [ "$TAG_VARIANT" != "$TAG_PREFIX" ] || TAG_VARIANT=""
-
-          # Additional tags — mirrors the if/elif chain in build.sh and publish.sh
-          if [ "$BASE_IMAGE_NAME" = "$DEFAULT_BASE" ] && \
-             [ "$LATEST" != "true" ] && \
-             [ "$TAG_VARIANT" != "ext" ] && [ "$TAG_VARIANT" != "perf" ]; then
-            # Version tag (e.g. cpython:3.14)
-            TAGS+=$'\n'"${IMAGE}:${TAG_PREFIX}"
-            # Major-version tag (e.g. cpython:3) — set by publish.sh
-            MAJOR="${TAG_PREFIX%%.*}"
-            [ "$MAJOR" = "$TAG_PREFIX" ] || TAGS+=$'\n'"${IMAGE}:${MAJOR}"
-          elif [ "$UNSTABLE" = "true" ]; then
-            TAGS+=$'\n'"${IMAGE}:unstable"
-          elif [ "$LATEST" = "true" ]; then
-            TAGS+=$'\n'"${IMAGE}:latest"
-            TAGS+=$'\n'"${IMAGE}:3"
-          fi
-
-          # Deduplicate tags
-          TAGS="$(echo "$TAGS" | awk '!seen[$0]++')"
-
-          # Cache reference (matches build.sh registry cache key)
-          CACHE_REF="${BUILD_TAG}-build-cache"
-
-          # Annotation metadata
-          BASE_CAP="$(echo "$BASE_IMAGE_NAME" | awk '{print toupper(substr($0,1,1)) tolower(substr($0,2))}')"
-          IMAGE_TITLE="${{ env.REPO_NAME }} - ${{ env.DEFAULT_TARGET }} - ${BASE_IMAGE_NAME} - ${BASE_IMAGE_VARIANT}"
-          REPO_SOURCE="https://${{ env.REGISTRY_PROVIDER_FQDN }}/${{ env.REPO_NAMESPACE }}/${{ env.REPO_NAME }}"
-          IMAGE_DESC="This ${BASE_CAP}-based Docker image is part of the ${{ env.REPO_NAME }} collection of container images. Built from ${BASE_IMAGE_NAME}:${BASE_IMAGE_VARIANT}. For documentation and source, visit: ${REPO_SOURCE}/blob/main/docker"
-          IMAGE_VERSION="${BUILD_TAG##*:}"
-
-          # Build args
-          BUILD_ARGS="IMAGE_NAME=${BASE_IMAGE_NAME}"
-          BUILD_ARGS+=$'\n'"VARIANT=${BASE_IMAGE_VARIANT}"
-          BUILD_ARGS+=$'\n'"USERNAME=${{ env.REMOTE_USER }}"
-          BUILD_ARGS+=$'\n'"TIMEZONE=${{ env.TIMEZONE }}"
-          BUILD_ARGS+=$'\n'"PYTHON_VERSION=${{ matrix.python_version }}"
-          BUILD_ARGS+=$'\n'"MAKEFLAGS=-j ${{ needs.setup.outputs.nproc }} ${{ env.DOCKER_BUILD_MAKEFLAGS }}"
-          BUILD_ARGS+=$'\n'"ENABLE_PRE_RELEASE=${{ env.DOCKER_BUILD_ENABLE_PRE_RELEASE }}"
-          if [ -n "${{ matrix.enable_optimizations }}" ]; then
-            BUILD_ARGS+=$'\n'"ENABLE_OPTIMIZATIONS=${{ matrix.enable_optimizations }}"
-          fi
-          if [ -n "${{ matrix.python_dev }}" ]; then
-            BUILD_ARGS+=$'\n'"PYTHON_DEV=${{ matrix.python_dev }}"
-          fi
-          if [ -n "${{ matrix.enable_bolt }}" ]; then
-            BUILD_ARGS+=$'\n'"ENABLE_BOLT=${{ matrix.enable_bolt }}"
-          fi
-
-          # Write outputs
-          {
-            echo "tags<<EOF"
-            echo "$TAGS"
-            echo "EOF"
-            echo "build_args<<EOF"
-            echo "$BUILD_ARGS"
-            echo "EOF"
-            echo "cache_ref=${CACHE_REF}"
-            echo "image_title=${IMAGE_TITLE}"
-            echo "image_desc=${IMAGE_DESC}"
-            echo "image_version=${IMAGE_VERSION}"
-            echo "repo_source=${REPO_SOURCE}"
-          } >> "$GITHUB_OUTPUT"
+        uses: ./.github/actions/docker-setup
+        with:
+          repo_name: ${{ env.REPO_NAME }}
+          repo_namespace: ${{ env.REPO_NAMESPACE }}
+          registry_provider_fqdn: ${{ env.REGISTRY_PROVIDER_FQDN }}
+          default_base_image_name: ${{ env.DEFAULT_BASE_IMAGE_NAME }}
+          default_target: ${{ env.DEFAULT_TARGET }}
+          remote_user: ${{ env.REMOTE_USER }}
+          timezone: ${{ env.TIMEZONE }}
+          docker_build_makeflags: ${{ env.DOCKER_BUILD_MAKEFLAGS }}
+          docker_build_enable_pre_release: ${{ env.DOCKER_BUILD_ENABLE_PRE_RELEASE }}
+          base_image_name: ${{ matrix.base_image_name }}
+          base_image_variant: ${{ matrix.base_image_variant }}
+          tag_prefix: ${{ matrix.tag_prefix }}
+          python_version: ${{ matrix.python_version }}
+          latest: ${{ matrix.latest }}
+          unstable: ${{ matrix.unstable }}
+          enable_optimizations: ${{ matrix.enable_optimizations }}
+          python_dev: ${{ matrix.python_dev }}
+          enable_bolt: ${{ matrix.enable_bolt }}
 
       - name: Build and push
         uses: docker/build-push-action@v7
