@@ -35,7 +35,10 @@ jobs:
     steps:
       - name: Detect CPU count
         id: cpu
-        run: echo "nproc=$(nproc)" >> "$GITHUB_OUTPUT"
+        run: |
+          nproc="$(nproc)"
+          echo "Detected $nproc CPU cores."
+          echo "nproc=$nproc" >> "$GITHUB_OUTPUT"
 
   build:
     name: '${{ matrix.tag_prefix }} (${{ matrix.base_image_name }}:${{ matrix.base_image_variant }})'
