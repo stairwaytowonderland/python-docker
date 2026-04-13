@@ -93,6 +93,7 @@ if [ -n "${IMAGE_NAME##*:}" ] && [ "${IMAGE_NAME##*:}" != "$IMAGE_NAME" ]; then
   DOCKER_TARGET="${IMAGE_NAME##*:}"
   IMAGE_NAME="${IMAGE_NAME%%:*}"
 fi
+CACHE_IMAGE="${CACHE_IMAGE:-${IMAGE_NAME}-build-cache}"
 DOCKER_TARGET="${DOCKER_TARGET:-$DEFAULT_TARGET}"
 # Determine REMOTE_USER (the devcontainer non-root user, e.g., 'vscode' or 'devcontainer')
 REMOTE_USER="${REMOTE_USER:-$second_arg}"
@@ -202,6 +203,7 @@ else
   fi
   IMAGE_VERSION="${IMAGE_VERSION:-latest}"
   REGISTRY_URL="${REGISTRY_URL_PREFIX}/${build_tag}"
+  REGISTRY_URL_CACHE="${REGISTRY_URL_PREFIX}/${CACHE_IMAGE}"
 
   registry_tag_com=("-t" "${REGISTRY_URL_PREFIX}/${build_tag}")
   [ -z "${version_tag-}" ] || registry_tag_com+=("-t" "${REGISTRY_URL_PREFIX}/${version_tag}")
@@ -218,7 +220,8 @@ else
     if [ "$PUSH" = "true" ]; then
       buildx_com+=("--platform=$(dedupe "${PLATFORM:-$DEFAULT_PLATFORM}")")
       buildx_com+=("--cache-from" "type=registry,ref=${REGISTRY_URL}-build-cache")
-      buildx_com+=("--cache-to" "type=registry,ref=${REGISTRY_URL}-build-cache,mode=max")
+      buildx_com+=("--cache-from" "type=registry,ref=${REGISTRY_URL_CACHE}")
+      buildx_com+=("--cache-to" "type=registry,ref=${REGISTRY_URL_CACHE},mode=max")
       buildx_com+=("--push")
       buildx_com+=("${registry_tag_com[@]}")
     else
