@@ -72,6 +72,8 @@ jobs:
               python_dev: 'true',
               enable_bolt: 'false',
             }
+
+          # ---- latest/current (debian:bookworm-slim) ----
           - {
               base_image_name: debian,
               base_image_variant: bookworm-slim,
@@ -84,6 +86,7 @@ jobs:
               base_image_variant: bookworm-slim,
               python_version: 'current',
               tag_prefix: 'latest',
+              latest: 'false',
             }
 
           # ──── ubuntu:latest ────
@@ -122,6 +125,9 @@ jobs:
               python_dev: 'true',
               enable_bolt: 'false',
             }
+
+          # ---- latest/current (ubuntu:latest) ----
+          # Note: 'latest' tag is built in a separate job after all matrix builds complete to ensure it's the last one built
           - {
               base_image_name: ubuntu,
               base_image_variant: latest,
@@ -129,8 +135,7 @@ jobs:
               tag_prefix: 'unstable',
               unstable: 'true',
             }
-
-          # ---- latest/current tags for (for reference) ----
+          # Note: 'latest' tag is built in a subsequent job to ensure it's the last one built
           # - {
           #     base_image_name: ubuntu,
           #     base_image_variant: latest,
@@ -246,8 +251,8 @@ jobs:
           base_image_name: ubuntu
           base_image_variant: latest
           tag_prefix: latest
-          # python_version: current
-          python_version: latest
+          python_version: current
+          # python_version: latest
           latest: 'true'
 
       - name: Build and push
