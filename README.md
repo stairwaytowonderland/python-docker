@@ -6,7 +6,7 @@ container-based workflows.
 
 *Inspired by a personal desire for a production-grade, Ubuntu-based Python "**base**" image.*
 
-Container repo hosted in [Docker Hub](https://hub.docker.com/repository/docker/stairwaytowonderland/cpython).
+Container repo hosted in [Docker Hub](https://hub.docker.com/r/stairwaytowonderland/cpython).
 
 See the detailed [**docs**](./docs/README.md) for more details.
 
