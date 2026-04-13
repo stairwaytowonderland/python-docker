@@ -1,22 +1,25 @@
 name: Build and Publish Docker Images
 
 on:
-  workflow_dispatch:
+  # Trigger on pushes to main branch when Docker-related files change
   push:
     branches: [main]
-    # paths:
-    #   - 'docker/helpers/**'
-    #   - 'docker/lib-scripts/**'
-    #   - 'docker/utils/**'
-    #   - 'docker/Dockerfile'
+    paths:
+      - 'docker/helpers/**'
+      - 'docker/lib-scripts/**'
+      - 'docker/utils/**'
+      - 'docker/Dockerfile'
+  # Manual trigger
+  workflow_dispatch:
+  # Run daily at 2:00 AM UTC to build latest/nightly images and ensure they stay up to date with recent changes
+  # NOTE: GitHub Actions scheduled workflows always run on UTC time
+  schedule:
+    - cron: '0 2 * * *'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-# ──────────────────────────────────────────────────────────
-# Non-sensitive values sourced from docker/.env
-# ──────────────────────────────────────────────────────────
 env:
   REPO_NAME: cpython
   REPO_NAMESPACE: stairwaytowonderland
@@ -119,13 +122,15 @@ jobs:
               python_dev: 'true',
               enable_bolt: 'false',
             }
-          # - {
-          #     base_image_name: ubuntu,
-          #     base_image_variant: latest,
-          #     python_version: 'latest',
-          #     tag_prefix: 'unstable',
-          #     unstable: 'true',
-          #   }
+          - {
+              base_image_name: ubuntu,
+              base_image_variant: latest,
+              python_version: 'latest',
+              tag_prefix: 'unstable',
+              unstable: 'true',
+            }
+
+          # ---- latest/current tags for (for reference) ----
           # - {
           #     base_image_name: ubuntu,
           #     base_image_variant: latest,
@@ -164,7 +169,6 @@ jobs:
       - name: Log in to Docker Hub
         uses: docker/login-action@v4
         with:
-          # registry: ${{ env.REGISTRY_HOST }}
           username: ${{ env.REPO_NAMESPACE }}
           password: ${{ secrets.CR_PAT }}
 

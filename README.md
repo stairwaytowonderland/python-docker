@@ -4,7 +4,7 @@ A self-maintained Python Docker image that builds [CPython](https://github.com/p
 Debian-based (Debian or Ubuntu) base image. Designed for use as a lightweight, customizable Python runtime in
 container-based workflows.
 
-*Inspired by a personal need (want) for a production-grade, Ubuntu-based Python "**base**" image.*
+*Inspired by a personal desire for a production-grade, Ubuntu-based Python "**base**" image.*
 
 Container repo hosted in [Docker Hub](https://hub.docker.com/repository/docker/stairwaytowonderland/cpython).
 

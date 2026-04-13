@@ -150,7 +150,7 @@ runs:
           BUILD_TAG="${IMAGE}:${TAG_PREFIX}-${BASE_IMAGE_REF}"
         fi
 
-        TAGS="$BUILD_TAG"
+        TAGS=("$BUILD_TAG")
 
         # Determine tag variant (text after first dash in TAG_PREFIX)
         TAG_VARIANT="${TAG_PREFIX#*-}"
@@ -161,19 +161,19 @@ runs:
            [ "$LATEST" != "true" ] && \
            [ "$TAG_VARIANT" != "ext" ] && [ "$TAG_VARIANT" != "perf" ]; then
           # Version tag (e.g. cpython:3.14)
-          TAGS+=$'\n'"${IMAGE}:${TAG_PREFIX}"
+          TAGS+=("${IMAGE}:${TAG_PREFIX}")
           # Major-version tag (e.g. cpython:3) — set by publish.sh
           MAJOR="${TAG_PREFIX%%.*}"
-          [ "$MAJOR" = "$TAG_PREFIX" ] || TAGS+=$'\n'"${IMAGE}:${MAJOR}"
+          [ "$MAJOR" = "$TAG_PREFIX" ] || TAGS+=("${IMAGE}:${MAJOR}")
         elif [ "$UNSTABLE" = "true" ]; then
-          TAGS+=$'\n'"${IMAGE}:unstable"
+          TAGS+=("${IMAGE}:unstable")
         elif [ "$LATEST" = "true" ]; then
-          TAGS+=$'\n'"${IMAGE}:latest"
-          TAGS+=$'\n'"${IMAGE}:3"
+          TAGS+=("${IMAGE}:latest")
+          TAGS+=("${IMAGE}:3")
         fi
 
         # Deduplicate tags
-        TAGS="$(echo "$TAGS" | awk '!seen[$0]++')"
+        TAGS_STR="$(printf '%s\n' "${TAGS[@]}" | awk '!seen[$0]++')"
 
         # Cache reference (matches build.sh registry cache key)
         CACHE_REF="${BUILD_TAG}-build-cache"
@@ -186,32 +186,36 @@ runs:
         IMAGE_VERSION="${BUILD_TAG##*:}"
 
         # Build args
-        BUILD_ARGS="IMAGE_NAME=${BASE_IMAGE_NAME}"
-        BUILD_ARGS+=$'\n'"VARIANT=${BASE_IMAGE_VARIANT}"
-        BUILD_ARGS+=$'\n'"USERNAME=${{ inputs.remote_user }}"
-        BUILD_ARGS+=$'\n'"TIMEZONE=${{ inputs.timezone }}"
-        BUILD_ARGS+=$'\n'"PYTHON_VERSION=${{ inputs.python_version }}"
-        BUILD_ARGS+=$'\n'"MAKEFLAGS=-j ${{ steps.setup.outputs.nproc }} ${{ inputs.docker_build_makeflags }}"
+        BUILD_ARGS=(
+          "IMAGE_NAME=${BASE_IMAGE_NAME}"
+          "VARIANT=${BASE_IMAGE_VARIANT}"
+          "USERNAME=${{ inputs.remote_user }}"
+          "TIMEZONE=${{ inputs.timezone }}"
+          "PYTHON_VERSION=${{ inputs.python_version }}"
+          "MAKEFLAGS=-j ${{ steps.setup.outputs.nproc }} ${{ inputs.docker_build_makeflags }}"
+        )
         if [ "${{ inputs.docker_build_enable_pre_release }}" = "true" ]; then
-          BUILD_ARGS+=$'\n'"ENABLE_PRE_RELEASE=${{ inputs.docker_build_enable_pre_release }}"
+          BUILD_ARGS+=("ENABLE_PRE_RELEASE=${{ inputs.docker_build_enable_pre_release }}")
         fi
         if [ "${{ inputs.enable_optimizations }}" = "true" ]; then
-          BUILD_ARGS+=$'\n'"ENABLE_OPTIMIZATIONS=${{ inputs.enable_optimizations }}"
+          BUILD_ARGS+=("ENABLE_OPTIMIZATIONS=${{ inputs.enable_optimizations }}")
         fi
         if [ "${{ inputs.python_dev }}" = "true" ]; then
-          BUILD_ARGS+=$'\n'"PYTHON_DEV=${{ inputs.python_dev }}"
+          BUILD_ARGS+=("PYTHON_DEV=${{ inputs.python_dev }}")
         fi
         if [ "${{ inputs.enable_bolt }}" = "true" ]; then
-          BUILD_ARGS+=$'\n'"ENABLE_BOLT=${{ inputs.enable_bolt }}"
+          BUILD_ARGS+=("ENABLE_BOLT=${{ inputs.enable_bolt }}")
         fi
+
+        BUILD_ARGS_STR="$(printf '%s\n' "${BUILD_ARGS[@]}")"
 
         # Write outputs
         {
           echo "tags<<EOF"
-          echo "$TAGS"
+          echo "$TAGS_STR"
           echo "EOF"
           echo "build_args<<EOF"
-          echo "$BUILD_ARGS"
+          echo "$BUILD_ARGS_STR"
           echo "EOF"
           echo "cache_ref=${CACHE_REF}"
           echo "image_title=${IMAGE_TITLE}"
