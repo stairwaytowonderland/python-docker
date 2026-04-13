@@ -4,11 +4,11 @@ on:
   # Trigger on pushes to main branch when Docker-related files change
   push:
     branches: [main]
-    # paths:
-    #   - 'docker/helpers/**'
-    #   - 'docker/lib-scripts/**'
-    #   - 'docker/utils/**'
-    #   - 'docker/Dockerfile'
+    paths:
+      - 'docker/helpers/**'
+      - 'docker/lib-scripts/**'
+      - 'docker/utils/**'
+      - 'docker/Dockerfile'
   # Manual trigger
   workflow_dispatch:
   # Run daily at 2:00 AM UTC to build latest/nightly images and ensure they stay up to date with recent changes
