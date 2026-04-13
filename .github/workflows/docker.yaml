@@ -203,7 +203,7 @@ jobs:
           build-args: ${{ steps.meta.outputs.build_args }}
           provenance: mode=max
           sbom: true
-          cache-from: type=registry,ref=${{ steps.meta.outputs.cache_ref }}
+          cache-from: type=registry,ref=${{ steps.meta.outputs.cache_ref_build_tag }}
           cache-to: type=registry,ref=${{ steps.meta.outputs.cache_ref }},mode=max
           annotations: |
             index:org.opencontainers.image.description=${{ steps.meta.outputs.image_desc }}

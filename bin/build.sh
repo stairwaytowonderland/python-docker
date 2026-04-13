@@ -219,7 +219,6 @@ else
     buildx_com+=("--sbom=true")
     if [ "$PUSH" = "true" ]; then
       buildx_com+=("--platform=$(dedupe "${PLATFORM:-$DEFAULT_PLATFORM}")")
-      buildx_com+=("--cache-from" "type=registry,ref=${REGISTRY_URL}-build-cache")
       buildx_com+=("--cache-from" "type=registry,ref=${REGISTRY_URL_CACHE}")
       buildx_com+=("--cache-to" "type=registry,ref=${REGISTRY_URL_CACHE},mode=max")
       buildx_com+=("--push")

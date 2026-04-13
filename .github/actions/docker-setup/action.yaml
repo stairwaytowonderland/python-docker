@@ -129,6 +129,7 @@ runs:
         set -euo pipefail
 
         IMAGE="${{ inputs.repo_namespace }}/${{ inputs.repo_name }}"
+        CACHE_IMAGE="${IMAGE}-build-cache"
         BASE_IMAGE_NAME="${{ steps.setup.outputs.base_image_name }}"
         BASE_IMAGE_VARIANT="${{ steps.setup.outputs.base_image_variant }}"
         TAG_PREFIX="${{ inputs.tag_prefix }}"
@@ -176,7 +177,8 @@ runs:
         TAGS_STR="$(printf '%s\n' "${TAGS[@]}" | awk '!seen[$0]++')"
 
         # Cache reference (matches build.sh registry cache key)
-        CACHE_REF="${BUILD_TAG}-build-cache"
+        CACHE_REF_BUILD_TAG="${BUILD_TAG}-build-cache"
+        CACHE_REF="${CACHE_IMAGE}"
 
         # Annotation metadata
         BASE_CAP="$(echo "$BASE_IMAGE_NAME" | awk '{print toupper(substr($0,1,1)) tolower(substr($0,2))}')"
@@ -217,7 +219,10 @@ runs:
           echo "build_args<<EOF"
           echo "$BUILD_ARGS_STR"
           echo "EOF"
+          echo "image_ref=${IMAGE}"
           echo "cache_ref=${CACHE_REF}"
+          echo "cache_ref_build_tag=${CACHE_REF_BUILD_TAG}"
+          echo "build_tag=${BUILD_TAG}"
           echo "image_title=${IMAGE_TITLE}"
           echo "image_desc=${IMAGE_DESC}"
           echo "image_version=${IMAGE_VERSION}"
