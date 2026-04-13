@@ -153,8 +153,10 @@ runs:
         # Compute primary build tag
         if [ "$TAG_PREFIX" = "latest" ]; then
           BUILD_TAG="${IMAGE}:${BASE_IMAGE_REF}"
+          CACHE_TAG="${CACHE_IMAGE}:${BASE_IMAGE_REF}"
         else
           BUILD_TAG="${IMAGE}:${TAG_PREFIX}-${BASE_IMAGE_REF}"
+          CACHE_TAG="${CACHE_IMAGE}:${TAG_PREFIX}-${BASE_IMAGE_REF}"
         fi
 
         TAGS=("$BUILD_TAG")
@@ -183,7 +185,7 @@ runs:
         TAGS_STR="$(printf '%s\n' "${TAGS[@]}" | awk '!seen[$0]++')"
 
         # Cache reference (matches build.sh registry cache key)
-        CACHE_REF="${CACHE_IMAGE}"
+        CACHE_REF="${CACHE_TAG}"
         CACHE_REF_BUILD_TAG="${BUILD_TAG}-build-cache"
 
         # Annotation metadata
