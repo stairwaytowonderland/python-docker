@@ -84,9 +84,15 @@ outputs:
   build_args:
     description: Newline-separated list of Docker build args
     value: ${{ steps.meta.outputs.build_args }}
+  image_ref:
+    description: Image reference (e.g. repo/image)
+    value: ${{ steps.meta.outputs.image_ref }}
   cache_ref:
     description: Registry cache reference for this build
     value: ${{ steps.meta.outputs.cache_ref }}
+  cache_ref_build_tag:
+    description: Registry cache reference if using only a tag cache key
+    value: ${{ steps.meta.outputs.cache_ref_build_tag }}
   image_title:
     description: OCI annotation image title
     value: ${{ steps.meta.outputs.image_title }}
@@ -177,8 +183,8 @@ runs:
         TAGS_STR="$(printf '%s\n' "${TAGS[@]}" | awk '!seen[$0]++')"
 
         # Cache reference (matches build.sh registry cache key)
-        CACHE_REF_BUILD_TAG="${BUILD_TAG}-build-cache"
         CACHE_REF="${CACHE_IMAGE}"
+        CACHE_REF_BUILD_TAG="${BUILD_TAG}-build-cache"
 
         # Annotation metadata
         BASE_CAP="$(echo "$BASE_IMAGE_NAME" | awk '{print toupper(substr($0,1,1)) tolower(substr($0,2))}')"
