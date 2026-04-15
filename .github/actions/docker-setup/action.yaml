@@ -84,15 +84,24 @@ outputs:
   build_args:
     description: Newline-separated list of Docker build args
     value: ${{ steps.meta.outputs.build_args }}
-  image_ref:
+  base_image_name:
+    description: Base image name used for this build (e.g. ubuntu)
+    value: ${{ steps.meta.outputs.base_image_name }}
+  base_image_variant:
+    description: Base image variant used for this build (e.g. 22.04)
+    value: ${{ steps.meta.outputs.base_image_variant }}
+  image_name:
     description: Image reference (e.g. repo/image)
-    value: ${{ steps.meta.outputs.image_ref }}
-  cache_ref:
+    value: ${{ steps.meta.outputs.image_name }}
+  build_tag:
+    description: Primary build tag (the first tag in the list)
+    value: ${{ steps.meta.outputs.build_tag }}
+  cache_image_name:
     description: Registry cache reference for this build
-    value: ${{ steps.meta.outputs.cache_ref }}
-  cache_ref_build_tag:
+    value: ${{ steps.meta.outputs.cache_image_name }}
+  cache_build_tag:
     description: Registry cache reference if using only a tag cache key
-    value: ${{ steps.meta.outputs.cache_ref_build_tag }}
+    value: ${{ steps.meta.outputs.cache_build_tag }}
   image_title:
     description: OCI annotation image title
     value: ${{ steps.meta.outputs.image_title }}
@@ -166,19 +175,18 @@ runs:
         [ "$TAG_VARIANT" != "$TAG_PREFIX" ] || TAG_VARIANT=""
 
         # Additional tags — mirrors the if/elif chain in build.sh and publish.sh
+        MAJOR="${TAG_PREFIX%%.*}"
         if [ "$BASE_IMAGE_NAME" = "$DEFAULT_BASE" ] && \
            [ "$LATEST" != "true" ] && \
            [ "$TAG_VARIANT" != "ext" ] && [ "$TAG_VARIANT" != "perf" ]; then
           # Version tag (e.g. cpython:3.14)
           TAGS+=("${IMAGE}:${TAG_PREFIX}")
-          # Major-version tag (e.g. cpython:3) — set by publish.sh
-          MAJOR="${TAG_PREFIX%%.*}"
           [ "$MAJOR" = "$TAG_PREFIX" ] || TAGS+=("${IMAGE}:${MAJOR}")
         elif [ "$UNSTABLE" = "true" ]; then
           TAGS+=("${IMAGE}:unstable")
         elif [ "$LATEST" = "true" ]; then
           TAGS+=("${IMAGE}:latest")
-          TAGS+=("${IMAGE}:3")
+          TAGS+=("${IMAGE}:${MAJOR}")
         fi
 
         # Deduplicate tags
@@ -227,10 +235,12 @@ runs:
           echo "build_args<<EOF"
           echo "$BUILD_ARGS_STR"
           echo "EOF"
-          echo "image_ref=${IMAGE}"
-          echo "cache_ref=${CACHE_REF}"
-          echo "cache_ref_build_tag=${CACHE_REF_BUILD_TAG}"
+          echo "base_image_name=${BASE_IMAGE_NAME}"
+          echo "base_image_variant=${BASE_IMAGE_VARIANT}"
+          echo "image_name=${IMAGE}"
           echo "build_tag=${BUILD_TAG}"
+          echo "cache_image_name=${CACHE_REF}"
+          echo "cache_build_tag=${CACHE_REF_BUILD_TAG}"
           echo "image_title=${IMAGE_TITLE}"
           echo "image_desc=${IMAGE_DESC}"
           echo "image_version=${IMAGE_VERSION}"
