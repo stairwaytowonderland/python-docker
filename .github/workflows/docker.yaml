@@ -285,7 +285,7 @@ jobs:
         uses: docker/scout-action@v1.20.4
         with:
           command: cves,recommendations
-          image: ${{ steps.meta.outputs.tags }}
+          image: ${{ steps.meta.outputs.build_tag }}
           only-severities: critical,high
           exit-code: true
           # to: ${{ env.DOCKER_REGISTRY }}/${{ steps.meta.outputs.image_name }}:${{ steps.meta.outputs.build_tag }}
@@ -330,6 +330,19 @@ jobs:
           python_version: current
           # python_version: latest
           latest: 'true'
+      # Extract metadata (tags, labels) for Docker
+      # https://github.com/docker/metadata-action
+      - name: Extract Docker metadata
+        id: metadata
+        uses: docker/metadata-action@v4.4.0
+        with:
+          images: ${{ env.DOCKER_REGISTRY }}/${{ steps.meta.outputs.image_name }}
+          # labels: |
+          #   org.opencontainers.image.revision=${{ env.SHA }}
+          tags: |
+            type=edge,branch=$repo.default_branch
+            type=semver,pattern=v{{version}}
+            type=sha,prefix=,suffix=,format=long
 
       - name: Build and push
         uses: docker/build-push-action@v7
@@ -362,7 +375,7 @@ jobs:
         uses: docker/scout-action@v1.20.4
         with:
           command: cves,recommendations
-          image: ${{ steps.meta.outputs.tags }}
+          image: ${{ steps.meta.outputs.build_tag }}
           only-severities: critical,high
           exit-code: true
           # to: ${{ env.DOCKER_REGISTRY }}/${{ steps.meta.outputs.image_name }}:${{ steps.meta.outputs.build_tag }}
@@ -408,6 +421,20 @@ jobs:
           # python_version: latest
           latest: 'true'
 
+      # Extract metadata (tags, labels) for Docker
+      # https://github.com/docker/metadata-action
+      - name: Extract Docker metadata
+        id: metadata
+        uses: docker/metadata-action@v4.4.0
+        with:
+          images: ${{ env.DOCKER_REGISTRY }}/${{ steps.meta.outputs.image_name }}
+          # labels: |
+          #   org.opencontainers.image.revision=${{ env.SHA }}
+          tags: |
+            type=edge,branch=$repo.default_branch
+            type=semver,pattern=v{{version}}
+            type=sha,prefix=,suffix=,format=long
+
       - name: Build and push
         uses: docker/build-push-action@v7
         with:
@@ -439,7 +466,7 @@ jobs:
         uses: docker/scout-action@v1.20.4
         with:
           command: cves,recommendations
-          image: ${{ steps.meta.outputs.tags }}
+          image: ${{ steps.meta.outputs.build_tag }}
           only-severities: critical,high
           exit-code: true
           # to: ${{ env.DOCKER_REGISTRY }}/${{ steps.meta.outputs.image_name }}:${{ steps.meta.outputs.build_tag }}
