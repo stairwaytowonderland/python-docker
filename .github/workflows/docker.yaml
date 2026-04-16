@@ -288,6 +288,9 @@ jobs:
           image: ${{ steps.meta.outputs.build_tag }}
           only-severities: critical,high
           exit-code: true
+          ignore-base: true
+          # ignore-unchanged: true
+          only-fixed: true
           # to: ${{ env.DOCKER_REGISTRY }}/${{ steps.meta.outputs.image_name }}:${{ steps.meta.outputs.build_tag }}
 
   build-latest-debian:
