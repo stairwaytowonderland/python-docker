@@ -224,7 +224,7 @@ jobs:
 
       - name: Log in to Docker Registry ${{ env.DOCKER_REGISTRY }}
         uses: docker/login-action@v4
-        # if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request'
         with:
           registry: ${{ env.DOCKER_REGISTRY }}
           username: ${{ secrets.DOCKER_USER }}
@@ -250,6 +250,7 @@ jobs:
       - name: Extract Docker metadata
         id: metadata
         uses: docker/metadata-action@v4.4.0
+        if: github.event_name != 'pull_request'
         with:
           images: ${{ env.DOCKER_REGISTRY }}/${{ steps.meta.outputs.image_name }}
           # labels: |
@@ -320,7 +321,7 @@ jobs:
 
       - name: Log in to Docker Registry ${{ env.DOCKER_REGISTRY }}
         uses: docker/login-action@v4
-        # if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request'
         with:
           registry: ${{ env.DOCKER_REGISTRY }}
           username: ${{ secrets.DOCKER_USER }}
@@ -343,6 +344,7 @@ jobs:
       - name: Extract Docker metadata
         id: metadata
         uses: docker/metadata-action@v4.4.0
+        if: github.event_name != 'pull_request'
         with:
           images: ${{ env.DOCKER_REGISTRY }}/${{ steps.meta.outputs.image_name }}
           # labels: |
@@ -410,7 +412,7 @@ jobs:
 
       - name: Log in to Docker Registry ${{ env.DOCKER_REGISTRY }}
         uses: docker/login-action@v4
-        # if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request'
         with:
           registry: ${{ env.DOCKER_REGISTRY }}
           username: ${{ secrets.DOCKER_USER }}
@@ -434,6 +436,7 @@ jobs:
       - name: Extract Docker metadata
         id: metadata
         uses: docker/metadata-action@v4.4.0
+        if: github.event_name != 'pull_request'
         with:
           images: ${{ env.DOCKER_REGISTRY }}/${{ steps.meta.outputs.image_name }}
           # labels: |
