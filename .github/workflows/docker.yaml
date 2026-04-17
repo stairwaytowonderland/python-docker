@@ -271,8 +271,8 @@ jobs:
           build-args: ${{ steps.meta.outputs.build_args }}
           provenance: mode=max
           sbom: true
-          cache-from: type=registry,ref=${{ steps.meta.outputs.cache_image_name }}
-          cache-to: type=registry,ref=${{ steps.meta.outputs.cache_image_name }},mode=max
+          cache-from: type=${{ github.event_name != 'pull_request' && 'registry' || 'gha' }},ref=${{ steps.meta.outputs.cache_image_name }}
+          cache-to: type=${{ github.event_name != 'pull_request' && 'registry' || 'gha' }},ref=${{ steps.meta.outputs.cache_image_name }},mode=max
           annotations: |
             index:org.opencontainers.image.description=${{ steps.meta.outputs.image_desc }}
             index:org.opencontainers.image.title=${{ steps.meta.outputs.image_title }}
