@@ -273,10 +273,10 @@ jobs:
           provenance: mode=max
           sbom: true
           cache-from: |
-            type=gha,scope=build-cache-${{ steps.meta.outputs.build_tag }}
+            type=gha,scope=${{ steps.meta.outputs.cache_image_name }}
             ${{ github.event_name != 'pull_request' && format('type=registry,ref={0}', steps.meta.outputs.cache_image_name) || '' }}
           cache-to: |
-            type=gha,scope=build-cache-${{ steps.meta.outputs.build_tag }},mode=max
+            type=gha,scope=${{ steps.meta.outputs.cache_image_name }},mode=max
             ${{ github.event_name != 'pull_request' && format('type=registry,ref={0},mode=max', steps.meta.outputs.cache_image_name) || '' }}
           annotations: |
             index:org.opencontainers.image.description=${{ steps.meta.outputs.image_desc }}
@@ -475,10 +475,10 @@ jobs:
           provenance: mode=max
           sbom: true
           cache-from: |
-            type=gha,scope=build-cache-${{ steps.meta.outputs.build_tag }}
+            type=gha,scope=${{ steps.meta.outputs.cache_image_name }}
             ${{ github.event_name != 'pull_request' && format('type=registry,ref={0}', steps.meta.outputs.cache_image_name) || '' }}
           cache-to: |
-            type=gha,scope=build-cache-${{ steps.meta.outputs.build_tag }},mode=max
+            type=gha,scope=${{ steps.meta.outputs.cache_image_name }},mode=max
             ${{ github.event_name != 'pull_request' && format('type=registry,ref={0},mode=max', steps.meta.outputs.cache_image_name) || '' }}
           annotations: |
             index:org.opencontainers.image.description=${{ steps.meta.outputs.image_desc }}
