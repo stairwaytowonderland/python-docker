@@ -247,18 +247,18 @@ jobs:
 
       # Extract metadata (tags, labels) for Docker
       # https://github.com/docker/metadata-action
-      - name: Extract Docker metadata
-        id: metadata
-        uses: docker/metadata-action@v4.4.0
-        if: github.event_name != 'pull_request'
-        with:
-          images: ${{ env.DOCKER_REGISTRY }}/${{ steps.meta.outputs.image_name }}
-          # labels: |
-          #   org.opencontainers.image.revision=${{ env.SHA }}
-          tags: |
-            type=edge,branch=$repo.default_branch
-            type=semver,pattern=v{{version}}
-            type=sha,prefix=,suffix=,format=long
+      # - name: Extract Docker metadata
+      #   id: metadata
+      #   uses: docker/metadata-action@v4.4.0
+      #   if: github.event_name != 'pull_request'
+      #   with:
+      #     images: ${{ env.DOCKER_REGISTRY }}/${{ steps.meta.outputs.image_name }}
+      #     # labels: |
+      #     #   org.opencontainers.image.revision=${{ env.SHA }}
+      #     tags: |
+      #       type=edge,branch=$repo.default_branch
+      #       type=semver,pattern=v{{version}}
+      #       type=sha,prefix=,suffix=,format=long
 
       - name: Build and push
         uses: docker/build-push-action@v7
@@ -272,8 +272,12 @@ jobs:
           build-args: ${{ steps.meta.outputs.build_args }}
           provenance: mode=max
           sbom: true
-          cache-from: type=${{ github.event_name != 'pull_request' && 'registry' || 'gha' }},ref=${{ steps.meta.outputs.cache_image_name }}
-          cache-to: type=${{ github.event_name != 'pull_request' && 'registry' || 'gha' }},ref=${{ steps.meta.outputs.cache_image_name }},mode=max
+          cache-from: |
+            type=gha,scope=build-cache-${{ steps.meta.outputs.image_name }}-${{ steps.meta.outputs.build_tag }}
+            ${{ github.event_name != 'pull_request' && format('type=registry,ref={0}', steps.meta.outputs.cache_image_name) || '' }}
+          cache-to: |
+            type=gha,scope=build-cache-${{ steps.meta.outputs.image_name }}-${{ steps.meta.outputs.build_tag }},mode=max
+            ${{ github.event_name != 'pull_request' && format('type=registry,ref={0},mode=max', steps.meta.outputs.cache_image_name) || '' }}
           annotations: |
             index:org.opencontainers.image.description=${{ steps.meta.outputs.image_desc }}
             index:org.opencontainers.image.title=${{ steps.meta.outputs.image_title }}
@@ -339,20 +343,21 @@ jobs:
           python_version: current
           # python_version: latest
           latest: 'true'
+
       # Extract metadata (tags, labels) for Docker
       # https://github.com/docker/metadata-action
-      - name: Extract Docker metadata
-        id: metadata
-        uses: docker/metadata-action@v4.4.0
-        if: github.event_name != 'pull_request'
-        with:
-          images: ${{ env.DOCKER_REGISTRY }}/${{ steps.meta.outputs.image_name }}
-          # labels: |
-          #   org.opencontainers.image.revision=${{ env.SHA }}
-          tags: |
-            type=edge,branch=$repo.default_branch
-            type=semver,pattern=v{{version}}
-            type=sha,prefix=,suffix=,format=long
+      # - name: Extract Docker metadata
+      #   id: metadata
+      #   uses: docker/metadata-action@v4.4.0
+      #   if: github.event_name != 'pull_request'
+      #   with:
+      #     images: ${{ env.DOCKER_REGISTRY }}/${{ steps.meta.outputs.image_name }}
+      #     # labels: |
+      #     #   org.opencontainers.image.revision=${{ env.SHA }}
+      #     tags: |
+      #       type=edge,branch=$repo.default_branch
+      #       type=semver,pattern=v{{version}}
+      #       type=sha,prefix=,suffix=,format=long
 
       - name: Build and push
         uses: docker/build-push-action@v7
@@ -366,8 +371,12 @@ jobs:
           build-args: ${{ steps.meta.outputs.build_args }}
           provenance: mode=max
           sbom: true
-          cache-from: type=registry,ref=${{ steps.meta.outputs.cache_image_name }}
-          cache-to: type=registry,ref=${{ steps.meta.outputs.cache_image_name }},mode=max
+          cache-from: |
+            type=gha,scope=build-cache-${{ steps.meta.outputs.image_name }}-${{ steps.meta.outputs.build_tag }}
+            ${{ github.event_name != 'pull_request' && format('type=registry,ref={0}', steps.meta.outputs.cache_image_name) || '' }}
+          cache-to: |
+            type=gha,scope=build-cache-${{ steps.meta.outputs.image_name }}-${{ steps.meta.outputs.build_tag }},mode=max
+            ${{ github.event_name != 'pull_request' && format('type=registry,ref={0},mode=max', steps.meta.outputs.cache_image_name) || '' }}
           annotations: |
             index:org.opencontainers.image.description=${{ steps.meta.outputs.image_desc }}
             index:org.opencontainers.image.title=${{ steps.meta.outputs.image_title }}
@@ -433,18 +442,18 @@ jobs:
 
       # Extract metadata (tags, labels) for Docker
       # https://github.com/docker/metadata-action
-      - name: Extract Docker metadata
-        id: metadata
-        uses: docker/metadata-action@v4.4.0
-        if: github.event_name != 'pull_request'
-        with:
-          images: ${{ env.DOCKER_REGISTRY }}/${{ steps.meta.outputs.image_name }}
-          # labels: |
-          #   org.opencontainers.image.revision=${{ env.SHA }}
-          tags: |
-            type=edge,branch=$repo.default_branch
-            type=semver,pattern=v{{version}}
-            type=sha,prefix=,suffix=,format=long
+      # - name: Extract Docker metadata
+      #   id: metadata
+      #   uses: docker/metadata-action@v4.4.0
+      #   if: github.event_name != 'pull_request'
+      #   with:
+      #     images: ${{ env.DOCKER_REGISTRY }}/${{ steps.meta.outputs.image_name }}
+      #     # labels: |
+      #     #   org.opencontainers.image.revision=${{ env.SHA }}
+      #     tags: |
+      #       type=edge,branch=$repo.default_branch
+      #       type=semver,pattern=v{{version}}
+      #       type=sha,prefix=,suffix=,format=long
 
       - name: Build and push
         uses: docker/build-push-action@v7
@@ -458,8 +467,12 @@ jobs:
           build-args: ${{ steps.meta.outputs.build_args }}
           provenance: mode=max
           sbom: true
-          cache-from: type=registry,ref=${{ steps.meta.outputs.cache_image_name }}
-          cache-to: type=registry,ref=${{ steps.meta.outputs.cache_image_name }},mode=max
+          cache-from: |
+            type=gha,scope=build-cache-${{ steps.meta.outputs.image_name }}-${{ steps.meta.outputs.build_tag }}
+            ${{ github.event_name != 'pull_request' && format('type=registry,ref={0}', steps.meta.outputs.cache_image_name) || '' }}
+          cache-to: |
+            type=gha,scope=build-cache-${{ steps.meta.outputs.image_name }}-${{ steps.meta.outputs.build_tag }},mode=max
+            ${{ github.event_name != 'pull_request' && format('type=registry,ref={0},mode=max', steps.meta.outputs.cache_image_name) || '' }}
           annotations: |
             index:org.opencontainers.image.description=${{ steps.meta.outputs.image_desc }}
             index:org.opencontainers.image.title=${{ steps.meta.outputs.image_title }}
