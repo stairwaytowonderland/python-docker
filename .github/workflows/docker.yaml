@@ -291,7 +291,7 @@ jobs:
 
       - name: Docker Scout
         id: docker-scout
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && matrix.base_image_name != 'dhi'
         uses: docker/scout-action@v1.20.4
         with:
           command: cves,recommendations
