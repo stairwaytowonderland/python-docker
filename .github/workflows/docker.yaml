@@ -301,9 +301,9 @@ jobs:
           dockerhub-user: ${{ github.event_name == 'pull_request' && secrets.DOCKER_USER || '' }}
           dockerhub-password: ${{ github.event_name == 'pull_request' && secrets.DOCKER_PAT || '' }}
           ignore-base: true
-          # ignore-unchanged: true
           only-fixed: true
-          # to: ${{ env.DOCKER_REGISTRY }}/${{ steps.meta.outputs.image_name }}:${{ steps.meta.outputs.build_tag }}
+          ignore-unchanged: true
+          to: ${{ env.DOCKER_REGISTRY }}/${{ steps.meta.outputs.image_name }}:${{ steps.meta.outputs.build_tag }}
 
   build-latest-debian:
     name: 'latest (debian:bookworm-slim)'
@@ -402,9 +402,9 @@ jobs:
           dockerhub-user: ${{ github.event_name == 'pull_request' && secrets.DOCKER_USER || '' }}
           dockerhub-password: ${{ github.event_name == 'pull_request' && secrets.DOCKER_PAT || '' }}
           ignore-base: true
-          # ignore-unchanged: true
           only-fixed: true
-          # to: ${{ env.DOCKER_REGISTRY }}/${{ steps.meta.outputs.image_name }}:${{ steps.meta.outputs.build_tag }}
+          ignore-unchanged: true
+          to: ${{ env.DOCKER_REGISTRY }}/${{ steps.meta.outputs.image_name }}:${{ steps.meta.outputs.build_tag }}
 
   build-latest-ubuntu:
     name: 'latest (ubuntu:latest)'
@@ -503,6 +503,6 @@ jobs:
           dockerhub-user: ${{ github.event_name == 'pull_request' && secrets.DOCKER_USER || '' }}
           dockerhub-password: ${{ github.event_name == 'pull_request' && secrets.DOCKER_PAT || '' }}
           ignore-base: true
-          # ignore-unchanged: true
           only-fixed: true
-          # to: ${{ env.DOCKER_REGISTRY }}/${{ steps.meta.outputs.image_name }}:${{ steps.meta.outputs.build_tag }}
+          ignore-unchanged: true
+          to: ${{ env.DOCKER_REGISTRY }}/${{ steps.meta.outputs.image_name }}:${{ steps.meta.outputs.build_tag }}
