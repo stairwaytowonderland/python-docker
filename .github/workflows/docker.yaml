@@ -303,7 +303,7 @@ jobs:
           ignore-base: true
           only-fixed: true
           ignore-unchanged: true
-          to: ${{ env.DOCKER_REGISTRY }}:${{ steps.meta.outputs.build_tag }}
+          to: ${{ env.DOCKER_REGISTRY }}/${{ steps.meta.outputs.build_tag }}
 
   build-latest-debian:
     name: 'latest (debian:bookworm-slim)'
@@ -404,7 +404,7 @@ jobs:
           ignore-base: true
           only-fixed: true
           ignore-unchanged: true
-          to: ${{ env.DOCKER_REGISTRY }}:${{ steps.meta.outputs.build_tag }}
+          to: ${{ env.DOCKER_REGISTRY }}/${{ steps.meta.outputs.build_tag }}
 
   build-latest-ubuntu:
     name: 'latest (ubuntu:latest)'
@@ -505,4 +505,4 @@ jobs:
           ignore-base: true
           only-fixed: true
           ignore-unchanged: true
-          to: ${{ env.DOCKER_REGISTRY }}:${{ steps.meta.outputs.build_tag }}
+          to: ${{ env.DOCKER_REGISTRY }}/${{ steps.meta.outputs.build_tag }}
