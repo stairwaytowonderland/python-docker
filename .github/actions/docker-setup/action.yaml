@@ -246,3 +246,23 @@ runs:
           echo "image_version=${IMAGE_VERSION}"
           echo "repo_source=${REPO_SOURCE}"
         } >> "$GITHUB_OUTPUT"
+
+    - name: Show outputs
+      if: always()
+      shell: bash
+      run: |
+        echo "Computed tags:"
+        echo "Tags:"
+        echo "${{ steps.meta.outputs.tags }}"
+        echo "Build args:"
+        echo "${{ steps.meta.outputs.build_args }}"
+        echo "Other computed variables and metadata:"
+        echo "Base image: ${{ steps.meta.outputs.base_image_name }}:${{ steps.meta.outputs.base_image_variant }}"
+        echo "Image name: ${{ steps.meta.outputs.image_name }}"
+        echo "Build tag: ${{ steps.meta.outputs.build_tag }}"
+        echo "Cache image ref: ${{ steps.meta.outputs.cache_image_name }}"
+        echo "Cache build tag: ${{ steps.meta.outputs.cache_build_tag }}"
+        echo "Image title: ${{ steps.meta.outputs.image_title }}"
+        echo "Image description: ${{ steps.meta.outputs.image_desc }}"
+        echo "Image version: ${{ steps.meta.outputs.image_version }}"
+        echo "Repository source: ${{ steps.meta.outputs.repo_source }}"
