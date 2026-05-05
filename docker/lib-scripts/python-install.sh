@@ -163,6 +163,7 @@ PACKAGES_TO_KEEP=""
 PACKAGES_TO_REMOVE=""
 PACKAGES_TO_INSTALL="$(
     cat << EOF
+distro-info-data
 lsb-release
 EOF
 )"
@@ -230,48 +231,56 @@ upgrade_pip() {
     fi
 }
 
+__check_llvm_version() {
+    # Check if the specified LLVM version is available in the apt.llvm.org repository for the current OS codename.
+
+    if (
+        set -x
+        wget -q --spider \
+            "https://apt.llvm.org/${1}/dists/llvm-toolchain-${1}-${2}/Release" \
+            2> /dev/null
+    ); then
+        return 0
+    fi
+    return 1
+}
+
 __resolve_llvm_codename() {
     # Return the most recent apt.llvm.org codename that carries the requested LLVM version.
     #
-    # Strategy:
-    #   1. Fast path  — probe the exact OS codename; return it if the repo exists.
-    #   2. Fallback   — fetch the apt.llvm.org index to get all known codenames,
-    #                   reverse the list (newest first), probe each one, and return
-    #                   the first hit.
-    #
-    # Note: the index page only advertises *currently active* LLVM branches, so
-    # grep-matching deb lines for older versions (e.g. 18) yields no results.
-    # Probing Release files directly is the only reliable method.
+    # 1. Fast path — probe the current OS codename directly; return it if supported.
+    # 2. Fallback  — read all released codenames from the distro-info data file
+    #                that ships with every Ubuntu/Debian system, walk them
+    #                newest-to-oldest, and return the first that has a Release file
+    #                for the requested LLVM version on apt.llvm.org.
     _rlc_codename="${1}"
     _rlc_version="${2}"
 
-    if wget -q --spider \
-        "https://apt.llvm.org/${_rlc_codename}/dists/llvm-toolchain-${_rlc_codename}-${_rlc_version}/Release" \
-        2> /dev/null; then
+    if __check_llvm_version "${_rlc_codename}" "${_rlc_version}"; then
         echo "${_rlc_codename}"
         return
     fi
 
-    # Extract all non-unstable codenames listed on the page (they appear as URL
-    # path segments: apt.llvm.org/<codename>/). Reverse so newest is probed first.
-    _rlc_best=$(
-        wget -qO- "https://apt.llvm.org/" 2> /dev/null \
-            | grep -oE "apt\.llvm\.org/[a-z]+/" \
-            | sed 's|apt\.llvm\.org/||;s|/$||' \
-            | grep -v "unstable" \
-            | uniq \
-            | awk '{a[NR]=$0} END{for(i=NR;i>=1;i--) print a[i]}' \
-            | while read -r _candidate; do
-                if wget -q --spider \
-                    "https://apt.llvm.org/${_candidate}/dists/llvm-toolchain-${_candidate}-${_rlc_version}/Release" \
-                    2> /dev/null; then
-                    echo "${_candidate}"
-                    break
-                fi
-            done
-    )
+    # distro-info-data column layout:
+    #   version, codename, series, created, release, eol, ...
+    # "series" (column 3) is the short apt codename used in repository URLs.
+    # Rows where release date (column 5) is empty are unreleased; skip them.
+    _rlc_csv="/usr/share/distro-info/$(os_id).csv"
+    if [ -f "$_rlc_csv" ]; then
+        # Reverse order so the newest released codename is tried first
+        _rlc_candidates=$(awk -F',' 'NR>1 && $3!="" && $5!="" {print $3}' "$_rlc_csv" \
+            | awk '{a[NR]=$0} END {for (i=NR; i>=1; i--) print a[i]}')
+        for _rlc_candidate in ${_rlc_candidates}; do
+            [ "$_rlc_candidate" != "$_rlc_codename" ] || continue
+            if __check_llvm_version "${_rlc_candidate}" "${_rlc_version}"; then
+                _rlc_codename="${_rlc_candidate}"
+                break
+            fi
+        done
+    fi
 
-    echo "${_rlc_best:-${_rlc_codename}}"
+    # No match found; return original so apt-get surfaces a clear error
+    echo "${_rlc_codename}"
 }
 
 install_llvm() {
