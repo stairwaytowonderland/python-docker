@@ -15,6 +15,7 @@ PYTHON_LIBDIR="${PYTHON_INSTALL_PATH%/lib}/lib"
 PYTHON_DEV="${PYTHON_DEV:-false}"
 SYSTEM_INSTALL_PREFIX="${SYSTEM_INSTALL_PREFIX:-/usr}"
 LLVM_VERSION="${LLVM_VERSION:-18}"
+LLVM_CODENAME="${LLVM_CODENAME:-}"
 UPDATE_NCURSES="${UPDATE_NCURSES:-false}"
 UPDATE_READLINE="${UPDATE_READLINE:-false}"
 ENABLE_SHARED="${ENABLE_SHARED:-true}"
@@ -162,6 +163,7 @@ PACKAGES_TO_KEEP=""
 PACKAGES_TO_REMOVE=""
 PACKAGES_TO_INSTALL="$(
     cat << EOF
+distro-info-data
 lsb-release
 EOF
 )"
@@ -229,12 +231,69 @@ upgrade_pip() {
     fi
 }
 
+__check_llvm_version() {
+    # Check if the specified LLVM version is available in the apt.llvm.org repository for the current OS codename.
+
+    if (
+        set -x
+        wget -q --spider \
+            "https://apt.llvm.org/${1}/dists/llvm-toolchain-${1}-${2}/Release" \
+            2> /dev/null
+    ); then
+        return 0
+    fi
+    return 1
+}
+
+__resolve_llvm_codename() {
+    # Return the most recent apt.llvm.org codename that carries the requested LLVM version.
+    #
+    # 1. Fast path — probe the current OS codename directly; return it if supported.
+    # 2. Fallback  — read all released codenames from the distro-info data file
+    #                that ships with every Ubuntu/Debian system, walk them
+    #                newest-to-oldest, and return the first that has a Release file
+    #                for the requested LLVM version on apt.llvm.org.
+    _rlc_codename="${1}"
+    _rlc_version="${2}"
+
+    if __check_llvm_version "${_rlc_codename}" "${_rlc_version}"; then
+        echo "${_rlc_codename}"
+        return
+    fi
+
+    # distro-info-data column layout:
+    #   version, codename, series, created, release, eol, ...
+    # "series" (column 3) is the short apt codename used in repository URLs.
+    # Rows where release date (column 5) is empty are unreleased; skip them.
+    _rlc_csv="/usr/share/distro-info/$(os_id).csv"
+    if [ -f "$_rlc_csv" ]; then
+        # Reverse order so the newest released codename is tried first
+        _rlc_candidates=$(awk -F',' 'NR>1 && $3!="" && $5!="" {print $3}' "$_rlc_csv" \
+            | awk '{a[NR]=$0} END {for (i=NR; i>=1; i--) print a[i]}')
+        for _rlc_candidate in ${_rlc_candidates}; do
+            [ "$_rlc_candidate" != "$_rlc_codename" ] || continue
+            if __check_llvm_version "${_rlc_candidate}" "${_rlc_version}"; then
+                _rlc_codename="${_rlc_candidate}"
+                break
+            fi
+        done
+    fi
+
+    # No match found; return original so apt-get surfaces a clear error
+    echo "${_rlc_codename}"
+}
+
 install_llvm() {
     _llvm_version="${1:-$LLVM_VERSION}"
     if [ "$UPDATE_LLVM" = "true" ]; then
         LEVEL='*' $LOGGER "Updating LLVM to version ${_llvm_version}..."
 
-        _codename="$(os_codename)"
+        _codename="${LLVM_CODENAME:-$(os_codename)}"
+        _resolved_codename="$(__resolve_llvm_codename "${_codename}" "${_llvm_version}")"
+        if [ "${_resolved_codename}" != "${_codename}" ]; then
+            LEVEL='!' $LOGGER "LLVM ${_llvm_version} repository not found for '${_codename}'; using '${_resolved_codename}'..."
+            _codename="${_resolved_codename}"
+        fi
         wget -qO /etc/apt/trusted.gpg.d/apt.llvm.org.asc https://apt.llvm.org/llvm-snapshot.gpg.key
         echo "deb http://apt.llvm.org/${_codename}/ llvm-toolchain-${_codename}-${_llvm_version} main" \
             > "/etc/apt/sources.list.d/llvm-${_llvm_version}".list
