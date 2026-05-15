@@ -353,7 +353,7 @@ prep_install() {
     # _major_minor_version="${VERSION%.*}"
     _major_version=$(get_major_version "$VERSION")
     _major_minor_version=$(get_major_minor_version "$VERSION")
-    _major_minor_patch_version=$(echo "$VERSION" | sed -E 's/^([0-9][0-9]?\.[0-9][0-9]?\.[0-9][0-9]?)([0-9acr]+)?$/\1/')
+    _major_minor_patch_version=$(echo "$VERSION" | sed -E 's/^([0-9][0-9]?\.[0-9][0-9]?\.[0-9][0-9]?)([0-9abcr]+)?$/\1/')
 
     if [ "$_major_minor_patch_version" != "$VERSION" ]; then
         LEVEL='*' $LOGGER "Interpreted version ${_version} (${VERSION}) as major.minor.patch version ${_major_minor_patch_version} with pre-release suffix '${VERSION#"$_major_minor_patch_version"}'."
